@@ -129,11 +129,14 @@ export async function buscarRateios(): Promise<RateioCC[]> {
   return (data || []).map(row => ({
     id:          row.id,
     equipamento: row.equipamento,
+    gerencia:    row.gerencia    || '', 
     descricao:   row.descricao   || '',
     parcelas:    row.parcelas    || [],
     ativo:       row.ativo,
     criadoEm:    row.criado_em,
   }));
+
+  
 }
 
 export async function salvarRateios(items: RateioCC[]): Promise<boolean> {
@@ -144,6 +147,7 @@ export async function salvarRateios(items: RateioCC[]): Promise<boolean> {
   const rows = items.map(item => ({
     id:          item.id,
     equipamento: item.equipamento,
+    gerencia:    item.gerencia || '',
     descricao:   item.descricao,
     parcelas:    item.parcelas,
     ativo:       item.ativo,
