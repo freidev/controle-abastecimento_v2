@@ -47,11 +47,9 @@ export default function App() {
   const [online, setOnline]         = useState(true);
   const [sincronizando, setSincronizando] = useState(false);
 
-  // Filtros persistentes do Dashboard
   const [filtrosAtivos, setFiltrosAtivos]   = useState<FiltroKey[]>(FILTROS_PADRAO_KEYS);
   const [filtroSelecoes, setFiltroSelecoes] = useState<FiltroSelecoes>(FILTRO_SELECOES_VAZIO);
 
-  // ── Carrega dados do Supabase na inicialização ──────────────────────────────
   useEffect(() => {
     const carregar = async () => {
       setCarregando(true);
@@ -63,29 +61,17 @@ export default function App() {
           buscarPreco(),
         ]);
 
-        // ⚠️ IMPORTANTE: só carrega dados iniciais se for a PRIMEIRA VEZ
-        // (verifica uma flag no localStorage para saber se já foi inicializado)
         const jaInicializado = localStorage.getItem('supabase_inicializado');
 
         if (!jaInicializado) {
-          // Primeira vez — carrega dados de exemplo no Supabase
           const dadosParaUsar = abs.length > 0 ? abs : dadosProcessados;
           const orcsParaUsar  = orcs.length > 0 ? orcs : orcamentoInicial;
-
           setDados(dadosParaUsar);
           setOrcamento(orcsParaUsar);
-
-          if (abs.length === 0) {
-            await atualizarAbastecimentos(dadosProcessados);
-          }
-          if (orcs.length === 0) {
-            await salvarOrcamentos(orcamentoInicial);
-          }
-
-          // Marca que já foi inicializado — nunca mais recarrega dados de exemplo
+          if (abs.length === 0) await atualizarAbastecimentos(dadosProcessados);
+          if (orcs.length === 0) await salvarOrcamentos(orcamentoInicial);
           localStorage.setItem('supabase_inicializado', 'true');
         } else {
-          // Já inicializado — usa EXATAMENTE o que veio do Supabase (mesmo se vazio)
           setDados(abs);
           setOrcamento(orcs);
         }
@@ -93,9 +79,7 @@ export default function App() {
         setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
-
       } catch {
-        // Offline — usa dados do localStorage ou vazio
         setDados([]);
         setOrcamento([]);
         setOnline(false);
@@ -106,39 +90,26 @@ export default function App() {
     carregar();
   }, []);
 
-  // ── Helpers de sincronização ────────────────────────────────────────────────
   const comSync = async (fn: () => Promise<void>) => {
     setSincronizando(true);
     try { await fn(); } finally { setSincronizando(false); }
   };
 
-  // ── Próximo ID ──────────────────────────────────────────────────────────────
   const nextId = useMemo(() =>
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
-  // ── Handlers sincronizados com Supabase ─────────────────────────────────────
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
-    const novo: Abastecimento = {
-      ...item,
-      id:    nextId,
-      valor: item.litros * parametros.precoDiesel,
-    };
+    const novo: Abastecimento = { ...item, id: nextId, valor: item.litros * parametros.precoDiesel };
     setDados(prev => [novo, ...prev]);
     await comSync(() => adicionarAbastecimento(novo).then(() => {}));
   }, [nextId, parametros.precoDiesel]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
-    const novos: Abastecimento[] = items.map(item => ({
-      ...item,
-      id:    id++,
-      valor: item.litros * parametros.precoDiesel,
-    }));
+    const novos: Abastecimento[] = items.map(item => ({ ...item, id: id++, valor: item.litros * parametros.precoDiesel }));
     setDados(prev => [...novos, ...prev]);
-    await comSync(async () => {
-      for (const n of novos) await adicionarAbastecimento(n);
-    });
+    await comSync(async () => { for (const n of novos) await adicionarAbastecimento(n); });
   }, [nextId, parametros.precoDiesel]);
 
   const handleDelete = useCallback(async (id: number) => {
@@ -167,49 +138,20 @@ export default function App() {
     await comSync(() => salvarRateios(novosRateios).then(() => {}));
   }, []);
 
-  // ── Dados realizados para orçamento ─────────────────────────────────────────
   const dadosRealizados = useMemo(() => {
     const ag: Record<string, number> = {};
-    dados.forEach(d => {
-      ag[d.diretoria] = (ag[d.diretoria] || 0) + d.litros * parametros.precoDiesel;
-    });
+    dados.forEach(d => { ag[d.diretoria] = (ag[d.diretoria] || 0) + d.litros * parametros.precoDiesel; });
     return Object.entries(ag).map(([diretoria, realizado]) => ({ diretoria, realizado }));
   }, [dados, parametros.precoDiesel]);
 
-  // ── Render das abas ──────────────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return (
-          <Dashboard
-            dados={dados}
-            orcamento={orcamento}
-            precoDiesel={parametros.precoDiesel}
-            filtrosAtivos={filtrosAtivos}
-            setFiltrosAtivos={setFiltrosAtivos}
-            filtroSelecoes={filtroSelecoes}
-            setFiltroSelecoes={setFiltroSelecoes}
-          />
-        );
+        return <Dashboard dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos} filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes} />;
       case 'base_dados':
-        return (
-          <BaseDados
-            dados={dados}
-            precoDiesel={parametros.precoDiesel}
-            onDelete={handleDelete}
-            onClearAll={handleClearAll}
-          />
-        );
+        return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} />;
       case 'orcamento':
-        return (
-          <Orcamento
-            orcamento={orcamento}
-            onUpdate={handleUpdateOrcamento}
-            dadosRealizados={dadosRealizados}
-            dados={dados}
-            precoDiesel={parametros.precoDiesel}
-          />
-        );
+        return <Orcamento orcamento={orcamento} onUpdate={handleUpdateOrcamento} dadosRealizados={dadosRealizados} dados={dados} precoDiesel={parametros.precoDiesel} />;
       case 'preenchimento':
         return <Preenchimento onAdd={handleAdd} nextId={nextId} />;
       case 'importacao':
@@ -224,15 +166,11 @@ export default function App() {
     }
   };
 
-  // ── Tela de carregamento ────────────────────────────────────────────────────
   if (carregando) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-2xl shadow-lg p-10 flex flex-col items-center gap-5"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-2xl shadow-lg p-10 flex flex-col items-center gap-5">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
             <Fuel className="w-8 h-8 text-white" />
           </div>
@@ -248,12 +186,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-
-            {/* Logo + Título */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Fuel className="w-5 h-5 text-white" />
@@ -262,78 +197,41 @@ export default function App() {
                 <h1 className="text-lg font-bold text-slate-800 leading-tight">Controle de Abastecimento</h1>
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-slate-500">Sistema Corporativo de Gestão de Combustível</p>
-                  {/* Indicador de status online/offline */}
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    online ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-                  }`}>
-                    {sincronizando
-                      ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                      : online
-                        ? <Wifi className="w-2.5 h-2.5" />
-                        : <WifiOff className="w-2.5 h-2.5" />
-                    }
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${online ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                    {sincronizando ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
                     {sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Nav Desktop */}
             <nav className="hidden lg:flex items-center gap-1">
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}>
+                    <Icon className="w-4 h-4" />{tab.label}
                   </button>
                 );
               })}
             </nav>
-
-            {/* Botão mobile */}
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
+            <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
-
-        {/* Nav Mobile */}
         <AnimatePresence>
           {menuOpen && (
-            <motion.nav
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="lg:hidden border-t border-slate-200 overflow-hidden bg-white"
-            >
+            <motion.nav initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              className="lg:hidden border-t border-slate-200 overflow-hidden bg-white">
               <div className="px-4 py-3 space-y-1">
                 {tabs.map(tab => {
                   const Icon = tab.icon;
                   return (
-                    <button
-                      key={tab.id}
-                      onClick={() => { setActiveTab(tab.id); setMenuOpen(false); }}
-                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                        activeTab === tab.id
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {tab.label}
+                    <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMenuOpen(false); }}
+                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                      <Icon className="w-4 h-4" />{tab.label}
                     </button>
                   );
                 })}
@@ -342,36 +240,18 @@ export default function App() {
           )}
         </AnimatePresence>
       </header>
-
-      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
             {renderContent()}
           </motion.div>
         </AnimatePresence>
       </main>
-
-      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
             <p>Controle de Abastecimento v1.0 — Sistema Corporativo</p>
-            <p>
-              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L
-              {' · '}
-              {dados.length} registros
-              {' · '}
-              <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
-                {online ? '🟢 Supabase conectado' : '🔴 Offline'}
-              </span>
-            </p>
+            <p>Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L · {dados.length} registros · <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>{online ? '🟢 Supabase conectado' : '🔴 Offline'}</span></p>
           </div>
         </div>
       </footer>
