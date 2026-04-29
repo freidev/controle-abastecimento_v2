@@ -91,26 +91,22 @@ export async function buscarOrcamentos(): Promise<OrcamentoDiretoria[]> {
   if (error) { console.error('Erro ao buscar orçamentos:', error); return []; }
 
   return (data || []).map(row => ({
-    diretoria:   row.diretoria,
-    orcamento:   row.orcamento,
-    dataInicio:  row.data_inicio || undefined,
-    dataFim:     row.data_fim    || undefined,
+    diretoria:  row.diretoria,
+    orcamento:  row.orcamento,
+    dataInicio: row.data_inicio || undefined,
+    dataFim:    row.data_fim    || undefined,
   }));
 }
 
 export async function salvarOrcamentos(items: OrcamentoDiretoria[]): Promise<boolean> {
-  // Deleta tudo e recria
   await supabase.from('orcamentos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
   if (items.length === 0) return true;
-
   const rows = items.map(item => ({
     diretoria:   item.diretoria,
     orcamento:   item.orcamento,
     data_inicio: item.dataInicio || null,
     data_fim:    item.dataFim    || null,
   }));
-
   const { error } = await supabase.from('orcamentos').insert(rows);
   if (error) { console.error('Erro ao salvar orçamentos:', error); return false; }
   return true;
@@ -129,21 +125,17 @@ export async function buscarRateios(): Promise<RateioCC[]> {
   return (data || []).map(row => ({
     id:          row.id,
     equipamento: row.equipamento,
-    gerencia:    row.gerencia    || '', 
-    descricao:   row.descricao   || '',
-    parcelas:    row.parcelas    || [],
+    gerencia:    row.gerencia  || '',
+    descricao:   row.descricao || '',
+    parcelas:    row.parcelas  || [],
     ativo:       row.ativo,
     criadoEm:    row.criado_em,
   }));
-
-  
 }
 
 export async function salvarRateios(items: RateioCC[]): Promise<boolean> {
   await supabase.from('rateios').delete().neq('id', '');
-
   if (items.length === 0) return true;
-
   const rows = items.map(item => ({
     id:          item.id,
     equipamento: item.equipamento,
@@ -153,7 +145,6 @@ export async function salvarRateios(items: RateioCC[]): Promise<boolean> {
     ativo:       item.ativo,
     criado_em:   item.criadoEm,
   }));
-
   const { error } = await supabase.from('rateios').insert(rows);
   if (error) { console.error('Erro ao salvar rateios:', error); return false; }
   return true;
@@ -167,7 +158,6 @@ export async function buscarPreco(): Promise<number> {
     .select('preco_diesel')
     .eq('id', 1)
     .single();
-
   if (error) { console.error('Erro ao buscar preço:', error); return 5.89; }
   return data?.preco_diesel || 5.89;
 }
@@ -176,7 +166,6 @@ export async function salvarPreco(preco: number): Promise<boolean> {
   const { error } = await supabase
     .from('parametros')
     .upsert({ id: 1, preco_diesel: preco });
-
   if (error) { console.error('Erro ao salvar preço:', error); return false; }
   return true;
 }
