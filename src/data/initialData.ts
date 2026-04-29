@@ -65,18 +65,17 @@ export const dadosIniciais: Abastecimento[] = [
   { id: 46, ccNovo: 'CC-MN-008', diretoria: 'Manutenção', gerencia: 'Elétrica', areaLot: 'Usina', fornecedor: 'Auto Posto Central', equipamento: 'Gerador GE-001', area: 'Manutenção', semana: 5, data: gerarData(0), litros: 185, valor: 0 },
 ];
 
-// Recalcular semanas baseado nas datas
 export const dadosProcessados = dadosIniciais.map(d => ({
   ...d,
   semana: getSemana(d.data),
 }));
 
 export const orcamentoInicial: OrcamentoDiretoria[] = [
-  { diretoria: 'Operações', orcamento: 85000 },
-  { diretoria: 'Manutenção', orcamento: 42000 },
-  { diretoria: 'Logística', orcamento: 38000 },
+  { diretoria: 'Operações',      orcamento: 85000 },
+  { diretoria: 'Manutenção',     orcamento: 42000 },
+  { diretoria: 'Logística',      orcamento: 38000 },
   { diretoria: 'Administrativo', orcamento: 12000 },
-  { diretoria: 'Segurança', orcamento: 18000 },
+  { diretoria: 'Segurança',      orcamento: 18000 },
 ];
 
 export const parametrosInicial = {
