@@ -57,7 +57,9 @@ export default function App() {
         const [abs, orcs, rats, preco] = await Promise.all([
           buscarAbastecimentos(), buscarOrcamentos(), buscarRateios(), buscarPreco(),
         ]);
-        setDados(abs); setOrcamento(orcs); setRateios(rats);
+        setDados(abs);
+        setOrcamento(orcs);
+        setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
       } catch {
@@ -140,7 +142,14 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} rateios={rateios} filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos} filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes} />;
+        return (
+          <Dashboard
+            dados={dados} orcamento={orcamento}
+            precoDiesel={parametros.precoDiesel} rateios={rateios}
+            filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos}
+            filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes}
+          />
+        );
       case 'base_dados':
         return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} onEdit={handleEdit} />;
       case 'orcamento':
@@ -244,7 +253,12 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
             <p>Controle de Abastecimento v1.0 — Sistema Corporativo</p>
-            <p>Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L · {dados.length} registros · <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>{online ? '🟢 Supabase conectado' : '🔴 Offline'}</span></p>
+            <p>
+              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L · {dados.length} registros ·{' '}
+              <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                {online ? '🟢 Supabase conectado' : '🔴 Offline'}
+              </span>
+            </p>
           </div>
         </div>
       </footer>
