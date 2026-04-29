@@ -63,22 +63,41 @@ export default function App() {
           buscarPreco(),
         ]);
 
-        // Se não há dados no Supabase, carrega os dados iniciais de exemplo
-        setDados(abs.length > 0 ? abs : dadosProcessados);
-        setOrcamento(orcs.length > 0 ? orcs : orcamentoInicial);
+        // ⚠️ IMPORTANTE: só carrega dados iniciais se for a PRIMEIRA VEZ
+        // (verifica uma flag no localStorage para saber se já foi inicializado)
+        const jaInicializado = localStorage.getItem('supabase_inicializado');
+
+        if (!jaInicializado) {
+          // Primeira vez — carrega dados de exemplo no Supabase
+          const dadosParaUsar = abs.length > 0 ? abs : dadosProcessados;
+          const orcsParaUsar  = orcs.length > 0 ? orcs : orcamentoInicial;
+
+          setDados(dadosParaUsar);
+          setOrcamento(orcsParaUsar);
+
+          if (abs.length === 0) {
+            await atualizarAbastecimentos(dadosProcessados);
+          }
+          if (orcs.length === 0) {
+            await salvarOrcamentos(orcamentoInicial);
+          }
+
+          // Marca que já foi inicializado — nunca mais recarrega dados de exemplo
+          localStorage.setItem('supabase_inicializado', 'true');
+        } else {
+          // Já inicializado — usa EXATAMENTE o que veio do Supabase (mesmo se vazio)
+          setDados(abs);
+          setOrcamento(orcs);
+        }
+
         setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
 
-        // Se era os dados iniciais, sincroniza com o Supabase
-        if (abs.length === 0) {
-          await atualizarAbastecimentos(dadosProcessados);
-          await salvarOrcamentos(orcamentoInicial);
-        }
       } catch {
-        // Offline — usa dados iniciais localmente
-        setDados(dadosProcessados);
-        setOrcamento(orcamentoInicial);
+        // Offline — usa dados do localStorage ou vazio
+        setDados([]);
+        setOrcamento([]);
         setOnline(false);
       } finally {
         setCarregando(false);
