@@ -5,18 +5,19 @@ import {
   AlertTriangle, CheckCircle2, Info, Fuel, Copy,
   ArrowRight, ToggleLeft, ToggleRight, Calculator, Search
 } from 'lucide-react';
-import { Abastecimento, RateioCC, RateioParcela, EQUIPAMENTOS } from '../types';
+import { Abastecimento, RateioCC, RateioParcela } from '../types';
 
-// ─── Campo com autocomplete híbrido (usado para CC e Gerência) ────────────────
 interface CCNovoInputProps {
   value: string;
   onChange: (val: string) => void;
   sugestoes: string[];
   placeholder?: string;
   blockedValues?: string[];
+  labelVazio?: string;
+  labelDigite?: string;
 }
 
-function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blockedValues = [] }: CCNovoInputProps) {
+function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blockedValues = [], labelVazio = 'Nenhum CC cadastrado na base', labelDigite = 'Digite um CC NOVO ou selecione abaixo' }: CCNovoInputProps) {
   const [aberto, setAberto] = useState(false);
   const [filtro, setFiltro] = useState(value);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -39,12 +40,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
       .slice(0, 10);
   }, [sugestoes, filtro, blockedValues]);
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFiltro(e.target.value);
-    onChange(e.target.value);
-    setAberto(true);
-  };
-
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => { setFiltro(e.target.value); onChange(e.target.value); setAberto(true); };
   const handleSelect = (cc: string) => { onChange(cc); setFiltro(cc); setAberto(false); };
   const isFromBase = sugestoes.includes(value);
 
@@ -52,7 +48,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
     <div ref={wrapperRef} className="relative">
       <div className={`flex items-center bg-white border rounded-lg transition-all ${aberto ? 'ring-2 ring-blue-500 border-blue-500' : 'border-slate-200 hover:border-slate-300'}`}>
         <input type="text" value={filtro} onChange={handleInput} onFocus={() => setAberto(true)} placeholder={placeholder}
-          className="flex-1 px-2.5 py-2 text-sm bg-transparent outline-none rounded-lg" />
+          className="flex-1 px-2.5 py-2 text-sm font-mono bg-transparent outline-none rounded-lg" />
         {isFromBase && !aberto && (
           <span className="mr-1.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded font-medium shrink-0">✓ base</span>
         )}
@@ -70,7 +66,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
             <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 bg-slate-50">
               <Search className="w-3 h-3 text-slate-400" />
               <span className="text-xs text-slate-500">
-                {sugestoes.length === 0 ? 'Nenhuma opção na base' : `${opcoesFiltradas.length} encontrado(s)`}
+                {sugestoes.length === 0 ? labelVazio : `${opcoesFiltradas.length} encontrado${opcoesFiltradas.length !== 1 ? 's' : ''}`}
               </span>
             </div>
             {opcoesFiltradas.length > 0 ? (
@@ -78,7 +74,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
                 {opcoesFiltradas.map(cc => (
                   <li key={cc}>
                     <button type="button" onMouseDown={e => { e.preventDefault(); handleSelect(cc); }}
-                      className={`w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-between gap-2 ${cc === value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700'}`}>
+                      className={`w-full text-left px-3 py-2.5 text-sm font-mono hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-between gap-2 ${cc === value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700'}`}>
                       <span>{cc}</span>
                       {cc === value && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                     </button>
@@ -87,7 +83,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
               </ul>
             ) : (
               <div className="px-3 py-3 text-xs text-slate-400 text-center">
-                {filtro ? <>Nenhuma opção para "<strong>{filtro}</strong>" — será usado como novo</> : 'Digite ou selecione abaixo'}
+                {filtro ? <>Nenhum resultado para "<strong>{filtro}</strong>" — será usado como novo</> : labelDigite}
               </div>
             )}
             {filtro && !sugestoes.includes(filtro) && (
@@ -95,7 +91,7 @@ function CCNovoInput({ value, onChange, sugestoes, placeholder = '42105500', blo
                 <button type="button" onMouseDown={e => { e.preventDefault(); handleSelect(filtro); setAberto(false); }}
                   className="w-full text-left px-3 py-2.5 text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2 transition-colors">
                   <Plus className="w-3.5 h-3.5 shrink-0" />
-                  Usar "<span className="font-semibold">{filtro}</span>" como novo valor
+                  Usar <span className="font-mono font-semibold">"{filtro}"</span> como novo CC
                 </button>
               </div>
             )}
@@ -117,7 +113,6 @@ const gerarId = () => Math.random().toString(36).slice(2, 10);
 const somaPerc = (p: RateioParcela[]) => p.reduce((a, b) => a + b.percentual, 0);
 const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// ─── Input de percentual sem bug do zero ─────────────────────────────────────
 interface PercentualInputProps { value: number; onChange: (val: number) => void; }
 
 function PercentualInput({ value, onChange }: PercentualInputProps) {
@@ -148,7 +143,6 @@ function PercentualInput({ value, onChange }: PercentualInputProps) {
   );
 }
 
-// ─── Editor ──────────────────────────────────────────────────────────────────
 interface EditorRateioProps {
   rateio: RateioCC;
   onSave: (r: RateioCC) => void;
@@ -156,9 +150,10 @@ interface EditorRateioProps {
   equipamentosDisponiveis: string[];
   ccsCadastrados: string[];
   gerenciasDaBase: string[];
+  ccsPorGerencia: Record<string, string[]>;
 }
 
-function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCadastrados, gerenciasDaBase }: EditorRateioProps) {
+function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCadastrados, gerenciasDaBase, ccsPorGerencia }: EditorRateioProps) {
   const [form, setForm] = useState<RateioCC>(JSON.parse(JSON.stringify(rateio)));
   const [erros, setErros] = useState<string[]>([]);
 
@@ -167,7 +162,7 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
 
   const addParcela = () => {
     if (form.parcelas.length >= 10) return;
-    setForm(f => ({ ...f, parcelas: [...f.parcelas, { ccNovo: '', descricaoCC: '', percentual: Math.max(0, 100 - soma) }] }));
+    setForm(f => ({ ...f, parcelas: [...f.parcelas, { ccNovo: '', descricaoCC: '', percentual: Math.max(0, 100 - soma), gerencia: '' }] }));
   };
 
   const removeParcela = (i: number) => setForm(f => ({ ...f, parcelas: f.parcelas.filter((_, idx) => idx !== i) }));
@@ -176,6 +171,7 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
     setForm(f => {
       const p = [...f.parcelas];
       p[i] = { ...p[i], [field]: field === 'percentual' ? Number(value) : value };
+      if (field === 'gerencia') p[i].ccNovo = '';
       return { ...f, parcelas: p };
     });
   };
@@ -190,12 +186,12 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
 
   const validar = () => {
     const errs: string[] = [];
-    if (!form.equipamento)       errs.push('Equipamento é obrigatório.');
-    if (!form.gerencia?.trim())  errs.push('Gerência vinculada é obrigatória.');
+    if (!form.equipamento) errs.push('Equipamento é obrigatório.');
     if (form.parcelas.length < 2) errs.push('Adicione pelo menos 2 centros de custo.');
     form.parcelas.forEach((p, i) => {
-      if (!p.ccNovo.trim()) errs.push(`Parcela ${i + 1}: CC NOVO é obrigatório.`);
-      if (p.percentual <= 0) errs.push(`Parcela ${i + 1}: percentual deve ser maior que 0.`);
+      if (!p.gerencia?.trim()) errs.push(`Parcela ${i + 1}: Gerência é obrigatória.`);
+      if (!p.ccNovo.trim())    errs.push(`Parcela ${i + 1}: CC NOVO é obrigatório.`);
+      if (p.percentual <= 0)   errs.push(`Parcela ${i + 1}: percentual deve ser maior que 0.`);
     });
     if (!somaOk) errs.push(`A soma deve ser 100% (atual: ${soma.toFixed(2)}%).`);
     const ccs = form.parcelas.map(p => p.ccNovo.trim()).filter(Boolean);
@@ -204,33 +200,22 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
     return errs.length === 0;
   };
 
+  const handleSave = () => {
+    if (!validar()) return;
+    const gerenciaPrincipal = form.parcelas[0]?.gerencia || '';
+    onSave({ ...form, gerencia: gerenciaPrincipal });
+  };
+
   return (
     <div className="space-y-5">
-      {/* Equipamento + Gerência + Descrição */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1.5 block uppercase tracking-wide">
             Equipamento <span className="text-red-500">*</span>
           </label>
-          <select value={form.equipamento} onChange={e => setForm(f => ({ ...f, equipamento: e.target.value }))}
-            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
-            <option value="">Selecione...</option>
-            {equipamentosDisponiveis.map(eq => <option key={eq} value={eq}>{eq}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-600 mb-1.5 block uppercase tracking-wide">
-            Gerência Vinculada <span className="text-red-500">*</span>
-          </label>
-          <CCNovoInput
-            value={form.gerencia || ''}
-            onChange={val => setForm(f => ({ ...f, gerencia: val }))}
-            sugestoes={gerenciasDaBase}
-            placeholder="Selecione ou digite a gerência..."
-          />
-          {gerenciasDaBase.length > 0 && (
-            <p className="text-xs text-slate-400 mt-1">{gerenciasDaBase.length} gerência(s) na base</p>
-          )}
+          <CCNovoInput value={form.equipamento} onChange={val => setForm(f => ({ ...f, equipamento: val }))}
+            sugestoes={equipamentosDisponiveis} placeholder="Selecione ou digite o equipamento..." />
+          {equipamentosDisponiveis.length === 0 && <p className="text-xs text-amber-600 mt-1">⚠️ Nenhum equipamento na base ainda</p>}
         </div>
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1.5 block uppercase tracking-wide">Descrição do Rateio</label>
@@ -240,10 +225,12 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
         </div>
       </div>
 
-      {/* Parcelas */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Centros de Custo e Porcentagens</label>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Gerências, Centros de Custo e Porcentagens</label>
+            <p className="text-xs text-slate-400 mt-0.5">Cada linha pode ter uma gerência diferente com seu CC NOVO</p>
+          </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={distribuirIgual}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
@@ -251,45 +238,59 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
             </button>
             <button type="button" onClick={addParcela} disabled={form.parcelas.length >= 10}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors">
-              <Plus className="w-3 h-3" /> Adicionar CC
+              <Plus className="w-3 h-3" /> Adicionar Gerência/CC
             </button>
           </div>
         </div>
 
-        <div className="space-y-2">
-          {form.parcelas.map((parcela, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-12 gap-2 items-center bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <div className="col-span-1 flex items-center justify-center">
-                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">{i + 1}</span>
-              </div>
-              <div className="col-span-3">
-                <label className="text-xs text-slate-400 mb-0.5 block">CC NOVO</label>
-                <CCNovoInput value={parcela.ccNovo} onChange={val => updateParcela(i, 'ccNovo', val)}
-                  sugestoes={ccsCadastrados}
-                  blockedValues={form.parcelas.filter((_, idx) => idx !== i).map(p => p.ccNovo).filter(Boolean)} />
-              </div>
-              <div className="col-span-5">
-                <label className="text-xs text-slate-400 mb-0.5 block">Descrição</label>
-                <input type="text" value={parcela.descricaoCC} onChange={e => updateParcela(i, 'descricaoCC', e.target.value)}
-                  placeholder="Ex: Mina A – Operações"
-                  className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-slate-400 mb-0.5 block">% Rateio</label>
-                <PercentualInput value={parcela.percentual} onChange={val => updateParcela(i, 'percentual', val)} />
-              </div>
-              <div className="col-span-1 flex justify-center">
-                <button type="button" onClick={() => removeParcela(i)} disabled={form.parcelas.length <= 2}
-                  className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 rounded-lg transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          ))}
+        <div className="space-y-3">
+          {form.parcelas.map((parcela, i) => {
+            const ccsDaGerencia = parcela.gerencia ? (ccsPorGerencia[parcela.gerencia] || []) : ccsCadastrados;
+            const ccsBloqueados = form.parcelas.filter((_, idx) => idx !== i).map(p => p.ccNovo).filter(Boolean);
+            return (
+              <motion.div key={i} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-500 mb-0.5 block font-medium">Gerência <span className="text-red-400">*</span></label>
+                    <CCNovoInput value={parcela.gerencia || ''} onChange={val => updateParcela(i, 'gerencia', val)}
+                      sugestoes={gerenciasDaBase} placeholder="Selecione ou digite a gerência..."
+                      labelVazio="Nenhuma Gerência cadastrada" labelDigite="Digite uma Gerência ou selecione abaixo" />
+                  </div>
+                  <button type="button" onClick={() => removeParcela(i)} disabled={form.parcelas.length <= 2}
+                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 rounded-lg transition-colors mt-4">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-12 gap-2 pl-8">
+                  <div className="col-span-3">
+                    <label className="text-xs text-slate-400 mb-0.5 block">
+                      CC NOVO <span className="text-red-400">*</span>
+                      {parcela.gerencia && ccsDaGerencia.length > 0 && <span className="ml-1 text-blue-500">({ccsDaGerencia.length} disponível/is)</span>}
+                    </label>
+                    <CCNovoInput value={parcela.ccNovo} onChange={val => updateParcela(i, 'ccNovo', val)}
+                      sugestoes={ccsDaGerencia} blockedValues={ccsBloqueados}
+                      placeholder={parcela.gerencia ? `CCs de ${parcela.gerencia}...` : 'Selecione a gerência primeiro'}
+                      labelVazio={parcela.gerencia ? `Nenhum CC para "${parcela.gerencia}"` : 'Selecione uma gerência acima'}
+                      labelDigite={parcela.gerencia ? `CCs da gerência ${parcela.gerencia}` : 'Selecione uma gerência acima'} />
+                  </div>
+                  <div className="col-span-6">
+                    <label className="text-xs text-slate-400 mb-0.5 block">Descrição</label>
+                    <input type="text" value={parcela.descricaoCC} onChange={e => updateParcela(i, 'descricaoCC', e.target.value)}
+                      placeholder="Ex: Mina A – Operações"
+                      className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-xs text-slate-400 mb-0.5 block">% Rateio</label>
+                    <PercentualInput value={parcela.percentual} onChange={val => updateParcela(i, 'percentual', val)} />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
-        {/* Barra de soma */}
         <div className="mt-3 p-3 rounded-xl border bg-white">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-600">Total das porcentagens</span>
@@ -301,41 +302,25 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
           </div>
           {!somaOk && (
             <p className="text-xs mt-1.5 text-center font-medium">
-              {soma < 100
-                ? <span className="text-amber-600">Faltam {(100 - soma).toFixed(2)}% para completar 100%</span>
-                : <span className="text-red-600">Excesso de {(soma - 100).toFixed(2)}% — reduza alguma parcela</span>
-              }
+              {soma < 100 ? <span className="text-amber-600">Faltam {(100 - soma).toFixed(2)}% para completar 100%</span>
+                : <span className="text-red-600">Excesso de {(soma - 100).toFixed(2)}% — reduza alguma parcela</span>}
             </p>
           )}
         </div>
       </div>
 
-      {/* Erros */}
       {erros.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-            <p className="text-sm font-semibold text-red-800">Corrija os erros:</p>
-          </div>
-          <ul className="space-y-1">
-            {erros.map((e, i) => (
-              <li key={i} className="text-sm text-red-700 flex items-start gap-2">
-                <span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5 flex-shrink-0" />{e}
-              </li>
-            ))}
-          </ul>
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2"><AlertTriangle className="w-4 h-4 text-red-600" /><p className="text-sm font-semibold text-red-800">Corrija os erros:</p></div>
+          <ul className="space-y-1">{erros.map((e, i) => <li key={i} className="text-sm text-red-700 flex items-start gap-2"><span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5 flex-shrink-0" />{e}</li>)}</ul>
         </motion.div>
       )}
 
-      {/* Botões */}
       <div className="flex gap-3 pt-2 border-t border-slate-200">
-        <button type="button" onClick={() => { if (validar()) onSave(form); }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-sm">
+        <button type="button" onClick={handleSave} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-sm">
           <Check className="w-4 h-4" /> Salvar Rateio
         </button>
-        <button type="button" onClick={onCancel}
-          className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors">
+        <button type="button" onClick={onCancel} className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors">
           <X className="w-4 h-4" /> Cancelar
         </button>
       </div>
@@ -343,7 +328,6 @@ function EditorRateio({ rateio, onSave, onCancel, equipamentosDisponiveis, ccsCa
   );
 }
 
-// ─── Card de rateio salvo ─────────────────────────────────────────────────────
 interface CardRateioProps {
   rateio: RateioCC; dados: Abastecimento[]; precoDiesel: number;
   onEdit: () => void; onDelete: () => void; onToggle: () => void;
@@ -365,9 +349,7 @@ function CardRateio({ rateio, dados, precoDiesel, onEdit, onDelete, onToggle }: 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-slate-800 text-sm truncate">{rateio.equipamento}</h3>
-            {rateio.gerencia && (
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full font-medium">{rateio.gerencia}</span>
-            )}
+            {rateio.gerencia && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full font-medium">{rateio.gerencia}</span>}
             {!rateio.ativo && <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full">Inativo</span>}
           </div>
           {rateio.descricao && <p className="text-xs text-slate-500 mt-0.5 truncate">{rateio.descricao}</p>}
@@ -417,9 +399,7 @@ function CardRateio({ rateio, dados, precoDiesel, onEdit, onDelete, onToggle }: 
                         <tr key={i} className="hover:bg-slate-50">
                           <td className="px-3 py-2.5 font-mono text-slate-800 font-medium">{p.ccNovo}</td>
                           <td className="px-3 py-2.5 text-slate-600 text-xs">{p.descricaoCC || '—'}</td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${i === 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{p.percentual}%</span>
-                          </td>
+                          <td className="px-3 py-2.5 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${i === 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{p.percentual}%</span></td>
                           <td className="px-3 py-2.5 text-right font-medium text-slate-700">{lp.toFixed(1)} L</td>
                           <td className="px-3 py-2.5 text-right font-semibold text-slate-800">{formatCurrency(lp * precoDiesel)}</td>
                         </tr>
@@ -465,7 +445,7 @@ function CardRateio({ rateio, dados, precoDiesel, onEdit, onDelete, onToggle }: 
               ) : (
                 <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
                   <Info className="w-4 h-4 flex-shrink-0" />
-                  Nenhum abastecimento encontrado para este equipamento.
+                  Nenhum abastecimento encontrado para este equipamento na base de dados.
                 </div>
               )}
             </div>
@@ -476,7 +456,6 @@ function CardRateio({ rateio, dados, precoDiesel, onEdit, onDelete, onToggle }: 
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
 export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioProps) {
   const [modoEdicao, setModoEdicao]     = useState<'none' | 'novo' | string>('none');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -484,7 +463,10 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
 
   const rateioVazio = (): RateioCC => ({
     id: gerarId(), equipamento: '', gerencia: '', descricao: '',
-    parcelas: [{ ccNovo: '', descricaoCC: '', percentual: 50 }, { ccNovo: '', descricaoCC: '', percentual: 50 }],
+    parcelas: [
+      { ccNovo: '', descricaoCC: '', percentual: 50 },
+      { ccNovo: '', descricaoCC: '', percentual: 50 },
+    ],
     ativo: true, criadoEm: new Date().toISOString(),
   });
 
@@ -498,25 +480,36 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
     setModoEdicao('none');
   };
 
-  const equipamentosUsados     = rateios.map(r => r.equipamento);
-  const equipamentosDisponiveis = EQUIPAMENTOS.filter(eq => !equipamentosUsados.includes(eq) || modoEdicao !== 'novo');
+  const equipamentosUsados = rateios.map(r => r.equipamento);
+  const equipamentosDaBase = useMemo(() => [...new Set(dados.map(d => d.equipamento).filter(Boolean))].sort(), [dados]);
+  const equipamentosDisponiveis = useMemo(
+    () => modoEdicao === 'novo' ? equipamentosDaBase.filter(eq => !equipamentosUsados.includes(eq)) : equipamentosDaBase,
+    [equipamentosDaBase, equipamentosUsados, modoEdicao]
+  );
 
-  const ccsCadastrados = useMemo(() => [...new Set(dados.map(d => d.ccNovo).filter(Boolean))].sort(), [dados]);
+  const ccsCadastrados  = useMemo(() => [...new Set(dados.map(d => d.ccNovo).filter(Boolean))].sort(), [dados]);
   const gerenciasDaBase = useMemo(() => [...new Set(dados.map(d => d.gerencia).filter(Boolean))].sort(), [dados]);
+
+  const ccsPorGerencia = useMemo(() => {
+    const mapa: Record<string, string[]> = {};
+    dados.forEach(d => {
+      if (!d.gerencia || !d.ccNovo) return;
+      if (!mapa[d.gerencia]) mapa[d.gerencia] = [];
+      if (!mapa[d.gerencia].includes(d.ccNovo)) mapa[d.gerencia].push(d.ccNovo);
+    });
+    Object.keys(mapa).forEach(k => mapa[k].sort());
+    return mapa;
+  }, [dados]);
 
   const totalAtivos   = rateios.filter(r => r.ativo).length;
   const totalInativos = rateios.filter(r => !r.ativo).length;
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-              <GitFork className="w-5 h-5 text-blue-600" />
-            </div>
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"><GitFork className="w-5 h-5 text-blue-600" /></div>
             <div>
               <h2 className="text-lg font-semibold text-slate-800">Rateio de Centro de Custo</h2>
               <p className="text-sm text-slate-500">Divida o custo de um equipamento entre múltiplos CCs por porcentagem</p>
@@ -527,15 +520,10 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
               <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full font-medium text-xs">
                 <CheckCircle2 className="w-3 h-3" />{totalAtivos} ativo{totalAtivos !== 1 ? 's' : ''}
               </span>
-              {totalInativos > 0 && (
-                <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full font-medium text-xs">
-                  {totalInativos} inativo{totalInativos !== 1 ? 's' : ''}
-                </span>
-              )}
+              {totalInativos > 0 && <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full font-medium text-xs">{totalInativos} inativo{totalInativos !== 1 ? 's' : ''}</span>}
             </div>
             {modoEdicao === 'none' && (
-              <button onClick={() => setModoEdicao('novo')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-sm text-sm">
+              <button onClick={() => setModoEdicao('novo')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-sm text-sm">
                 <Plus className="w-4 h-4" /> Novo Rateio
               </button>
             )}
@@ -543,19 +531,16 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
         </div>
       </motion.div>
 
-      {/* Info vazia */}
       {rateios.length === 0 && modoEdicao === 'none' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="bg-blue-50 border border-blue-200 rounded-xl p-5 flex gap-3">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-blue-50 border border-blue-200 rounded-xl p-5 flex gap-3">
           <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-blue-800 mb-1">Como funciona o Rateio?</p>
-            <p className="text-sm text-blue-700">Configure um rateio para cada equipamento compartilhado entre centros de custo. O sistema calculará automaticamente a divisão de litros e valores.</p>
+            <p className="text-sm text-blue-700">Configure um rateio para cada equipamento compartilhado entre centros de custo. O sistema calculará automaticamente a divisão de litros e valores proporcionais a cada abastecimento registrado para aquele equipamento.</p>
           </div>
         </motion.div>
       )}
 
-      {/* Feedback duplicado */}
       <AnimatePresence>
         {copiado && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
@@ -565,7 +550,6 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
         )}
       </AnimatePresence>
 
-      {/* Formulário */}
       <AnimatePresence>
         {modoEdicao !== 'none' && (
           <motion.div key="editor" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
@@ -580,32 +564,29 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
               rateio={modoEdicao === 'novo' ? rateioVazio() : rateioEmEdicao}
               onSave={handleSaveRateio}
               onCancel={() => setModoEdicao('none')}
-              equipamentosDisponiveis={modoEdicao === 'novo' ? equipamentosDisponiveis : EQUIPAMENTOS}
+              equipamentosDisponiveis={equipamentosDisponiveis}
               ccsCadastrados={ccsCadastrados}
               gerenciasDaBase={gerenciasDaBase}
+              ccsPorGerencia={ccsPorGerencia}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Lista */}
       {rateios.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Rateios Configurados ({rateios.length})</p>
           {rateios.map(r => (
             <div key={r.id}>
               {confirmDelete === r.id ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-red-700">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     <p className="text-sm font-medium">Remover rateio de <strong>{r.equipamento}</strong>?</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { onSave(rateios.filter(x => x.id !== r.id)); setConfirmDelete(null); }}
-                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">Remover</button>
-                    <button onClick={() => setConfirmDelete(null)}
-                      className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg transition-colors">Cancelar</button>
+                    <button onClick={() => { onSave(rateios.filter(x => x.id !== r.id)); setConfirmDelete(null); }} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">Remover</button>
+                    <button onClick={() => setConfirmDelete(null)} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg transition-colors">Cancelar</button>
                   </div>
                 </motion.div>
               ) : (
@@ -626,13 +607,9 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
         </div>
       )}
 
-      {/* Resumo Geral */}
       {rateios.filter(r => r.ativo).length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Calculator className="w-4 h-4 text-blue-600" />
-            <h3 className="font-semibold text-slate-800 text-sm">Resumo Geral de Rateio</h3>
-          </div>
+          <div className="flex items-center gap-2 mb-4"><Calculator className="w-4 h-4 text-blue-600" /><h3 className="font-semibold text-slate-800 text-sm">Resumo Geral de Rateio</h3></div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -651,8 +628,8 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
                   const totalL = absEquip.reduce((a, d) => a + d.litros, 0);
                   const totalV = totalL * precoDiesel;
                   return r.parcelas.map((p, i) => ({
-                    equipamento: i === 0 ? r.equipamento : '',
-                    gerencia:    i === 0 ? (r.gerencia || '—') : '',
+                    equipamento: r.equipamento,
+                    gerencia: p.gerencia || r.gerencia || '—',
                     isFirst: i === 0, cc: p.ccNovo, desc: p.descricaoCC,
                     perc: p.percentual,
                     litros: (totalL * p.percentual) / 100,
@@ -661,18 +638,18 @@ export default function Rateio({ dados, rateios, precoDiesel, onSave }: RateioPr
                 }).map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50">
                     <td className="px-3 py-2.5 text-slate-700 font-medium text-xs">
-                      {row.isFirst ? <div className="flex items-center gap-1.5"><Fuel className="w-3.5 h-3.5 text-blue-500" />{row.equipamento}</div> : ''}
+                      <div className="flex items-center gap-1.5"><Fuel className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />{row.equipamento}</div>
                     </td>
                     <td className="px-3 py-2.5 text-xs">
-                      {row.isFirst && row.gerencia ? <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium text-xs">{row.gerencia}</span> : ''}
+                      {row.gerencia && row.gerencia !== '—'
+                        ? <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium text-xs">{row.gerencia}</span>
+                        : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="font-mono text-slate-800 font-medium">{row.cc}</span>
                       {row.desc && <span className="text-xs text-slate-400 ml-1">· {row.desc}</span>}
                     </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{row.perc}%</span>
-                    </td>
+                    <td className="px-3 py-2.5 text-center"><span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{row.perc}%</span></td>
                     <td className="px-3 py-2.5 text-right font-medium text-slate-700">{row.litros.toFixed(1)} L</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-slate-800">{formatCurrency(row.valor)}</td>
                   </tr>
