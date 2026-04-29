@@ -23,7 +23,8 @@ export interface OrcamentoDiretoria {
 // ── Rateio de Centro de Custo ─────────────────────────────────────────────
 export interface RateioCC {
   id: string;                  // uuid gerado na criação
-  equipamento: string;         // ex: "Caminhão CA-001"
+  equipamento: string;        // ex: "Caminhão CA-001"
+  gerencia: string;            
   descricao: string;           // descrição livre do rateio
   parcelas: RateioParcela[];   // sempre deve somar 100%
   ativo: boolean;
