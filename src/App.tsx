@@ -26,14 +26,14 @@ import Exportacao    from './components/Exportacao';
 import Rateio        from './components/Rateio';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
-  { id: 'dashboard',      label: 'Dashboard',    icon: LayoutDashboard },
-  { id: 'base_dados',    label: 'Base de Dados', icon: Database        },
-  { id: 'orcamento',     label: 'Orçamento',     icon: Wallet          },
-  { id: 'rateio',        label: 'Rateio CC',     icon: GitFork         },
-  { id: 'preenchimento', label: 'Preenchimento', icon: FilePlus        },
-  { id: 'importacao',    label: 'Importação',    icon: Upload          },
-  { id: 'exportacao',    label: 'Exportação',    icon: FileDown        },
-  { id: 'parametros',    label: 'Parâmetros',    icon: Settings        },
+  { id: 'dashboard',      label: 'Dashboard',     icon: LayoutDashboard },
+  { id: 'base_dados',    label: 'Base de Dados',  icon: Database        },
+  { id: 'orcamento',     label: 'Orçamento',      icon: Wallet          },
+  { id: 'rateio',        label: 'Rateio CC',      icon: GitFork         },
+  { id: 'preenchimento', label: 'Preenchimento',  icon: FilePlus        },
+  { id: 'importacao',    label: 'Importação',     icon: Upload          },
+  { id: 'exportacao',    label: 'Exportação',     icon: FileDown        },
+  { id: 'parametros',    label: 'Parâmetros',     icon: Settings        },
 ];
 
 export default function App() {
@@ -55,20 +55,13 @@ export default function App() {
       setCarregando(true);
       try {
         const [abs, orcs, rats, preco] = await Promise.all([
-          buscarAbastecimentos(),
-          buscarOrcamentos(),
-          buscarRateios(),
-          buscarPreco(),
+          buscarAbastecimentos(), buscarOrcamentos(), buscarRateios(), buscarPreco(),
         ]);
-        setDados(abs);
-        setOrcamento(orcs);
-        setRateios(rats);
+        setDados(abs); setOrcamento(orcs); setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
       } catch {
-        setDados([]);
-        setOrcamento([]);
-        setOnline(false);
+        setDados([]); setOrcamento([]); setOnline(false);
       } finally {
         setCarregando(false);
       }
@@ -113,17 +106,11 @@ export default function App() {
     await comSync(async () => {
       const { supabase } = await import('./lib/supabase');
       await supabase.from('abastecimentos').update({
-        cc_novo:     itemAtualizado.ccNovo,
-        diretoria:   itemAtualizado.diretoria,
-        gerencia:    itemAtualizado.gerencia,
-        area_lot:    itemAtualizado.areaLot,
-        fornecedor:  itemAtualizado.fornecedor,
-        equipamento: itemAtualizado.equipamento,
-        area:        itemAtualizado.area,
-        semana:      itemAtualizado.semana,
-        data:        itemAtualizado.data,
-        litros:      itemAtualizado.litros,
-        valor:       itemAtualizado.valor,
+        cc_novo: itemAtualizado.ccNovo, diretoria: itemAtualizado.diretoria,
+        gerencia: itemAtualizado.gerencia, area_lot: itemAtualizado.areaLot,
+        fornecedor: itemAtualizado.fornecedor, equipamento: itemAtualizado.equipamento,
+        area: itemAtualizado.area, semana: itemAtualizado.semana,
+        data: itemAtualizado.data, litros: itemAtualizado.litros, valor: itemAtualizado.valor,
       }).eq('id', itemAtualizado.id);
     });
   }, []);
@@ -153,7 +140,7 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos} filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes} />;
+        return <Dashboard dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} rateios={rateios} filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos} filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes} />;
       case 'base_dados':
         return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} onEdit={handleEdit} />;
       case 'orcamento':
@@ -216,8 +203,8 @@ export default function App() {
                 const isActive = activeTab === tab.id;
                 return (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}>
-                    <Icon className="w-4 h-4" />{tab.label}
+                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}>
+                    <Icon className="w-4 h-4 flex-shrink-0" />{tab.label}
                   </button>
                 );
               })}
