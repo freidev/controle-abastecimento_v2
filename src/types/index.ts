@@ -16,28 +16,27 @@ export interface Abastecimento {
 export interface OrcamentoDiretoria {
   diretoria: string;
   orcamento: number;
-  dataInicio?: string;  // YYYY-MM-DD
-  dataFim?: string;     // YYYY-MM-DD
+  dataInicio?: string;
+  dataFim?: string;
 }
 
-// ── Rateio de Centro de Custo ─────────────────────────────────────────────
 export interface RateioCC {
-  id: string;                  // uuid gerado na criação
-  equipamento: string;        // ex: "Caminhão CA-001"
-  gerencia: string;            
-  descricao: string;           // descrição livre do rateio
-  parcelas: RateioParcela[];   // sempre deve somar 100%
+  id: string;
+  equipamento: string;
+  gerencia: string;
+  descricao: string;
+  parcelas: RateioParcela[];
   ativo: boolean;
   criadoEm: string;
 }
 
 export interface RateioParcela {
-  ccNovo: string;              // ex: "42105500"
-  descricaoCC: string;         // ex: "Mina A – Operações"
-  percentual: number;          // 0-100, soma total = 100
+  ccNovo: string;
+  descricaoCC: string;
+  percentual: number;
+  gerencia?: string;
 }
 
-// Resultado calculado de um rateio sobre um abastecimento
 export interface RateioResultado {
   abastecimentoId: number;
   equipamento: string;
@@ -59,7 +58,6 @@ export interface ParametrosSistema {
 
 export type TabType = 'dashboard' | 'base_dados' | 'parametros' | 'preenchimento' | 'importacao' | 'orcamento' | 'exportacao' | 'rateio';
 
-// ── Estado persistente dos filtros do Dashboard ───────────────────────────────
 export type FiltroKey =
   | 'semana' | 'diretoria' | 'gerencia' | 'areaLot'
   | 'equipamento' | 'ccNovo' | 'fornecedor' | 'area'
@@ -76,11 +74,7 @@ export const FILTRO_SELECOES_VAZIO: FiltroSelecoes = {
 };
 
 export const DIRETORIAS = [
-  'Operações',
-  'Manutenção',
-  'Logística',
-  'Administrativo',
-  'Segurança',
+  'Operações', 'Manutenção', 'Logística', 'Administrativo', 'Segurança',
 ];
 
 export const GERENCIAS: Record<string, string[]> = {
@@ -92,50 +86,26 @@ export const GERENCIAS: Record<string, string[]> = {
 };
 
 export const AREAS_LOT = [
-  'Mina A',
-  'Mina B',
-  'Usina',
-  'Pátio',
-  'Escritório Central',
-  'Base Logística',
-  'Portaria',
+  'Mina A', 'Mina B', 'Usina', 'Pátio',
+  'Escritório Central', 'Base Logística', 'Portaria',
 ];
 
 export const FORNECEDORES = [
-  'Posto Shell',
-  'Posto Ipiranga',
-  'Posto BR',
-  'Posto Ale',
-  'Auto Posto Central',
+  'Posto Shell', 'Posto Ipiranga', 'Posto BR',
+  'Posto Ale', 'Auto Posto Central',
 ];
 
 export const EQUIPAMENTOS = [
-  'Caminhão CA-001',
-  'Caminhão CA-002',
-  'Caminhão CA-003',
-  'Escavadeira EX-001',
-  'Escavadeira EX-002',
-  'Pá Carregadeira PC-001',
-  'Pá Carregadeira PC-002',
-  'Trator TR-001',
-  'Trator TR-002',
-  'Retroescavadeira RE-001',
-  'Gerador GE-001',
-  'Gerador GE-002',
-  'Empilhadeira EM-001',
-  'Pickup PK-001',
-  'Pickup PK-002',
-  'Pickup PK-003',
-  'Ônibus ON-001',
-  'Van VN-001',
-  'Motoniveladora MN-001',
+  'Caminhão CA-001', 'Caminhão CA-002', 'Caminhão CA-003',
+  'Escavadeira EX-001', 'Escavadeira EX-002',
+  'Pá Carregadeira PC-001', 'Pá Carregadeira PC-002',
+  'Trator TR-001', 'Trator TR-002', 'Retroescavadeira RE-001',
+  'Gerador GE-001', 'Gerador GE-002', 'Empilhadeira EM-001',
+  'Pickup PK-001', 'Pickup PK-002', 'Pickup PK-003',
+  'Ônibus ON-001', 'Van VN-001', 'Motoniveladora MN-001',
   'Rolo Compactador RC-001',
 ];
 
 export const AREAS = [
-  'Produção',
-  'Manutenção',
-  'Transporte',
-  'Administrativo',
-  'Segurança',
+  'Produção', 'Manutenção', 'Transporte', 'Administrativo', 'Segurança',
 ];
