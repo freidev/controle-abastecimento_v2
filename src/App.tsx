@@ -8,10 +8,10 @@ import {
   Abastecimento, OrcamentoDiretoria, RateioCC, TabType,
   FiltroKey, FiltroSelecoes, FILTROS_PADRAO_KEYS, FILTRO_SELECOES_VAZIO,
 } from './types';
-import { dadosProcessados, orcamentoInicial, parametrosInicial } from './data/initialData';
+import { parametrosInicial } from './data/initialData';
 import {
   buscarAbastecimentos, adicionarAbastecimento, deletarAbastecimento,
-  limparAbastecimentos, atualizarAbastecimentos,
+  limparAbastecimentos,
   buscarOrcamentos, salvarOrcamentos,
   buscarRateios, salvarRateios,
   buscarPreco, salvarPreco,
@@ -26,14 +26,14 @@ import Exportacao    from './components/Exportacao';
 import Rateio        from './components/Rateio';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
-  { id: 'dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
-  { id: 'base_dados',   label: 'Base de Dados', icon: Database        },
-  { id: 'orcamento',    label: 'Orçamento',     icon: Wallet          },
-  { id: 'rateio',       label: 'Rateio CC',     icon: GitFork         },
+  { id: 'dashboard',      label: 'Dashboard',    icon: LayoutDashboard },
+  { id: 'base_dados',    label: 'Base de Dados', icon: Database        },
+  { id: 'orcamento',     label: 'Orçamento',     icon: Wallet          },
+  { id: 'rateio',        label: 'Rateio CC',     icon: GitFork         },
   { id: 'preenchimento', label: 'Preenchimento', icon: FilePlus        },
-  { id: 'importacao',   label: 'Importação',    icon: Upload          },
-  { id: 'exportacao',   label: 'Exportação',    icon: FileDown        },
-  { id: 'parametros',   label: 'Parâmetros',    icon: Settings        },
+  { id: 'importacao',    label: 'Importação',    icon: Upload          },
+  { id: 'exportacao',    label: 'Exportação',    icon: FileDown        },
+  { id: 'parametros',    label: 'Parâmetros',    icon: Settings        },
 ];
 
 export default function App() {
@@ -60,22 +60,8 @@ export default function App() {
           buscarRateios(),
           buscarPreco(),
         ]);
-
-        const jaInicializado = localStorage.getItem('supabase_inicializado');
-
-        if (!jaInicializado) {
-          const dadosParaUsar = abs.length > 0 ? abs : dadosProcessados;
-          const orcsParaUsar  = orcs.length > 0 ? orcs : orcamentoInicial;
-          setDados(dadosParaUsar);
-          setOrcamento(orcsParaUsar);
-          if (abs.length === 0) await atualizarAbastecimentos(dadosProcessados);
-          if (orcs.length === 0) await salvarOrcamentos(orcamentoInicial);
-          localStorage.setItem('supabase_inicializado', 'true');
-        } else {
-          setDados(abs);
-          setOrcamento(orcs);
-        }
-
+        setDados(abs);
+        setOrcamento(orcs);
         setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
@@ -122,6 +108,26 @@ export default function App() {
     await comSync(() => limparAbastecimentos().then(() => {}));
   }, []);
 
+  const handleEdit = useCallback(async (itemAtualizado: Abastecimento) => {
+    setDados(prev => prev.map(d => d.id === itemAtualizado.id ? itemAtualizado : d));
+    await comSync(async () => {
+      const { supabase } = await import('./lib/supabase');
+      await supabase.from('abastecimentos').update({
+        cc_novo:     itemAtualizado.ccNovo,
+        diretoria:   itemAtualizado.diretoria,
+        gerencia:    itemAtualizado.gerencia,
+        area_lot:    itemAtualizado.areaLot,
+        fornecedor:  itemAtualizado.fornecedor,
+        equipamento: itemAtualizado.equipamento,
+        area:        itemAtualizado.area,
+        semana:      itemAtualizado.semana,
+        data:        itemAtualizado.data,
+        litros:      itemAtualizado.litros,
+        valor:       itemAtualizado.valor,
+      }).eq('id', itemAtualizado.id);
+    });
+  }, []);
+
   const handleChangePreco = useCallback(async (valor: number) => {
     setParametros(prev => ({ ...prev, precoDiesel: valor }));
     setDados(prev => prev.map(d => ({ ...d, valor: d.litros * valor })));
@@ -149,7 +155,7 @@ export default function App() {
       case 'dashboard':
         return <Dashboard dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos} filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes} />;
       case 'base_dados':
-        return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} />;
+        return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} onEdit={handleEdit} />;
       case 'orcamento':
         return <Orcamento orcamento={orcamento} onUpdate={handleUpdateOrcamento} dadosRealizados={dadosRealizados} dados={dados} precoDiesel={parametros.precoDiesel} />;
       case 'preenchimento':
