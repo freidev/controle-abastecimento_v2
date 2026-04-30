@@ -47,8 +47,28 @@ export default function App() {
   const [online, setOnline]         = useState(true);
   const [sincronizando, setSincronizando] = useState(false);
 
-  const [filtrosAtivos, setFiltrosAtivos]   = useState<FiltroKey[]>(FILTROS_PADRAO_KEYS);
+  // ── Filtros persistentes — salvo no localStorage ──────────────────────────
+  const [filtrosAtivos, setFiltrosAtivos] = useState<FiltroKey[]>(() => {
+    try {
+      const salvo = localStorage.getItem('dashboard_filtros_ativos');
+      if (salvo) {
+        const parsed = JSON.parse(salvo) as FiltroKey[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignora */ }
+    return FILTROS_PADRAO_KEYS;
+  });
+
   const [filtroSelecoes, setFiltroSelecoes] = useState<FiltroSelecoes>(FILTRO_SELECOES_VAZIO);
+
+  // Salva filtrosAtivos no localStorage toda vez que mudar
+  const setFiltrosAtivosComSalvar = useCallback((action: React.SetStateAction<FiltroKey[]>) => {
+    setFiltrosAtivos(prev => {
+      const proximo = typeof action === 'function' ? action(prev) : action;
+      try { localStorage.setItem('dashboard_filtros_ativos', JSON.stringify(proximo)); } catch { /* ignora */ }
+      return proximo;
+    });
+  }, []);
 
   useEffect(() => {
     const carregar = async () => {
@@ -57,9 +77,7 @@ export default function App() {
         const [abs, orcs, rats, preco] = await Promise.all([
           buscarAbastecimentos(), buscarOrcamentos(), buscarRateios(), buscarPreco(),
         ]);
-        setDados(abs);
-        setOrcamento(orcs);
-        setRateios(rats);
+        setDados(abs); setOrcamento(orcs); setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
       } catch {
@@ -146,8 +164,10 @@ export default function App() {
           <Dashboard
             dados={dados} orcamento={orcamento}
             precoDiesel={parametros.precoDiesel} rateios={rateios}
-            filtrosAtivos={filtrosAtivos} setFiltrosAtivos={setFiltrosAtivos}
-            filtroSelecoes={filtroSelecoes} setFiltroSelecoes={setFiltroSelecoes}
+            filtrosAtivos={filtrosAtivos}
+            setFiltrosAtivos={setFiltrosAtivosComSalvar}
+            filtroSelecoes={filtroSelecoes}
+            setFiltroSelecoes={setFiltroSelecoes}
           />
         );
       case 'base_dados':
@@ -155,7 +175,7 @@ export default function App() {
       case 'orcamento':
         return <Orcamento orcamento={orcamento} onUpdate={handleUpdateOrcamento} dadosRealizados={dadosRealizados} dados={dados} precoDiesel={parametros.precoDiesel} />;
       case 'preenchimento':
-        return <Preenchimento onAdd={handleAdd} nextId={nextId} />;
+        return <Preenchimento onAdd={handleAdd} nextId={nextId} dados={dados} />;
       case 'importacao':
         return <Importacao onImport={handleImport} />;
       case 'exportacao':
@@ -191,38 +211,55 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+
+            {/* Logo + Título */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Fuel className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-800 leading-tight">Controle de Abastecimento</h1>
+              <div className="min-w-0">
+                <h1 className="text-base font-bold text-slate-800 leading-tight whitespace-nowrap">
+                  Controle de Abastecimento
+                </h1>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-slate-500">Sistema Corporativo de Gestão de Combustível</p>
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${online ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                    {sincronizando ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                  <p className="text-xs text-slate-500 whitespace-nowrap hidden sm:block">
+                    Gestão de Combustível
+                  </p>
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                    online ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                  }`}>
+                    {sincronizando
+                      ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />
+                    }
                     {sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Nav Desktop */}
             <nav className="hidden lg:flex items-center gap-1">
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}>
+                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                      isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                    }`}>
                     <Icon className="w-4 h-4 flex-shrink-0" />{tab.label}
                   </button>
                 );
               })}
             </nav>
+
             <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
         <AnimatePresence>
           {menuOpen && (
             <motion.nav initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
@@ -232,7 +269,9 @@ export default function App() {
                   const Icon = tab.icon;
                   return (
                     <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMenuOpen(false); }}
-                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                      }`}>
                       <Icon className="w-4 h-4" />{tab.label}
                     </button>
                   );
@@ -242,6 +281,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </header>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
@@ -249,6 +289,7 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+
       <footer className="border-t border-slate-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
