@@ -2,10 +2,12 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Database, Settings, FilePlus, Upload, Wallet,
-  Fuel, Menu, X, FileDown, GitFork, Loader2, Wifi, WifiOff
+  Menu, X, FileDown, GitFork, Loader2, Wifi, WifiOff, Wrench, LogOut, Users
 } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
+import Login from './components/Login';
 import {
-  Abastecimento, OrcamentoDiretoria, RateioCC, TabType,
+  Abastecimento, OrcamentoDiretoria, RateioCC, TabType, Equipamento,
   FiltroKey, FiltroSelecoes, FILTROS_PADRAO_KEYS, FILTRO_SELECOES_VAZIO,
 } from './types';
 import { parametrosInicial } from './data/initialData';
@@ -23,31 +25,44 @@ import Preenchimento from './components/Preenchimento';
 import Importacao    from './components/Importacao';
 import Orcamento     from './components/Orcamento';
 import Exportacao    from './components/Exportacao';
-import Rateio        from './components/Rateio';
+import Rateio               from './components/Rateio';
+import CadastroEquipamento  from './components/CadastroEquipamento';
+import GerenciarUsuarios    from './components/GerenciarUsuarios';
+import LogoStratos          from './components/LogoStratos';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
-  { id: 'dashboard',      label: 'Dashboard',     icon: LayoutDashboard },
-  { id: 'base_dados',    label: 'Base de Dados',  icon: Database        },
-  { id: 'orcamento',     label: 'Orçamento',      icon: Wallet          },
-  { id: 'rateio',        label: 'Rateio CC',      icon: GitFork         },
-  { id: 'preenchimento', label: 'Preenchimento',  icon: FilePlus        },
-  { id: 'importacao',    label: 'Importação',     icon: Upload          },
-  { id: 'exportacao',    label: 'Exportação',     icon: FileDown        },
-  { id: 'parametros',    label: 'Parâmetros',     icon: Settings        },
+  { id: 'dashboard',             label: 'Dashboard',      icon: LayoutDashboard },
+  { id: 'base_dados',           label: 'Base de Dados',   icon: Database        },
+  { id: 'orcamento',            label: 'Orçamento',       icon: Wallet          },
+  { id: 'rateio',               label: 'Rateio CC',       icon: GitFork         },
+  { id: 'cadastro_equipamento', label: 'Equipamentos',    icon: Wrench          },
+  { id: 'usuarios',             label: 'Usuários',        icon: Users           },
+  { id: 'preenchimento',        label: 'Preenchimento',   icon: FilePlus        },
+  { id: 'importacao',           label: 'Importação',      icon: Upload          },
+  { id: 'exportacao',           label: 'Exportação',      icon: FileDown        },
+  { id: 'parametros',           label: 'Parâmetros',      icon: Settings        },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab]   = useState<TabType>('dashboard');
+  const { user, logout, podeAcessar } = useAuth();
+
+  // Se não logado, mostra tela de login
+  if (!user) return <Login />;
+
+  const [activeTab, setActiveTab]   = useState<TabType>(
+    podeAcessar('dashboard') ? 'dashboard' : 'preenchimento'
+  );
   const [dados, setDados]           = useState<Abastecimento[]>([]);
   const [orcamento, setOrcamento]   = useState<OrcamentoDiretoria[]>([]);
-  const [rateios, setRateios]       = useState<RateioCC[]>([]);
+  const [rateios, setRateios]             = useState<RateioCC[]>([]);
+  const [equipamentosCad, setEquipamentosCad] = useState<Equipamento[]>([]);
   const [parametros, setParametros] = useState(parametrosInicial);
   const [menuOpen, setMenuOpen]     = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [online, setOnline]         = useState(true);
   const [sincronizando, setSincronizando] = useState(false);
 
-  // ── Filtros persistentes — salvo no localStorage ──────────────────────────
+  // Filtros persistentes do Dashboard — salvo no localStorage para sobreviver ao reload
   const [filtrosAtivos, setFiltrosAtivos] = useState<FiltroKey[]>(() => {
     try {
       const salvo = localStorage.getItem('dashboard_filtros_ativos');
@@ -70,18 +85,31 @@ export default function App() {
     });
   }, []);
 
+  // ── Carrega dados do Supabase na inicialização ──────────────────────────────
   useEffect(() => {
     const carregar = async () => {
       setCarregando(true);
       try {
         const [abs, orcs, rats, preco] = await Promise.all([
-          buscarAbastecimentos(), buscarOrcamentos(), buscarRateios(), buscarPreco(),
+          buscarAbastecimentos(),
+          buscarOrcamentos(),
+          buscarRateios(),
+          buscarPreco(),
         ]);
-        setDados(abs); setOrcamento(orcs); setRateios(rats);
+
+        // Sempre usa exatamente o que veio do Supabase — nunca injeta dados de exemplo
+        setDados(abs);
+        setOrcamento(orcs);
+
+        setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
+
       } catch {
-        setDados([]); setOrcamento([]); setOnline(false);
+        // Offline — usa dados do localStorage ou vazio
+        setDados([]);
+        setOrcamento([]);
+        setOnline(false);
       } finally {
         setCarregando(false);
       }
@@ -89,26 +117,39 @@ export default function App() {
     carregar();
   }, []);
 
+  // ── Helpers de sincronização ────────────────────────────────────────────────
   const comSync = async (fn: () => Promise<void>) => {
     setSincronizando(true);
     try { await fn(); } finally { setSincronizando(false); }
   };
 
+  // ── Próximo ID ──────────────────────────────────────────────────────────────
   const nextId = useMemo(() =>
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
+  // ── Handlers sincronizados com Supabase ─────────────────────────────────────
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
-    const novo: Abastecimento = { ...item, id: nextId, valor: item.litros * parametros.precoDiesel };
+    const novo: Abastecimento = {
+      ...item,
+      id:    nextId,
+      valor: item.litros * parametros.precoDiesel,
+    };
     setDados(prev => [novo, ...prev]);
     await comSync(() => adicionarAbastecimento(novo).then(() => {}));
   }, [nextId, parametros.precoDiesel]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
-    const novos: Abastecimento[] = items.map(item => ({ ...item, id: id++, valor: item.litros * parametros.precoDiesel }));
+    const novos: Abastecimento[] = items.map(item => ({
+      ...item,
+      id:    id++,
+      valor: item.litros * parametros.precoDiesel,
+    }));
     setDados(prev => [...novos, ...prev]);
-    await comSync(async () => { for (const n of novos) await adicionarAbastecimento(n); });
+    await comSync(async () => {
+      for (const n of novos) await adicionarAbastecimento(n);
+    });
   }, [nextId, parametros.precoDiesel]);
 
   const handleDelete = useCallback(async (id: number) => {
@@ -126,14 +167,20 @@ export default function App() {
     await comSync(async () => {
       const { supabase } = await import('./lib/supabase');
       await supabase.from('abastecimentos').update({
-        cc_novo: itemAtualizado.ccNovo, diretoria: itemAtualizado.diretoria,
-        gerencia: itemAtualizado.gerencia, area_lot: itemAtualizado.areaLot,
-        fornecedor: itemAtualizado.fornecedor, equipamento: itemAtualizado.equipamento,
-        area: itemAtualizado.area, semana: itemAtualizado.semana,
-        data: itemAtualizado.data, litros: itemAtualizado.litros, valor: itemAtualizado.valor,
+        cc_novo:     itemAtualizado.ccNovo,
+        diretoria:   itemAtualizado.diretoria,
+        gerencia:    itemAtualizado.gerencia,
+        area_lot:    itemAtualizado.areaLot,
+        fornecedor:  itemAtualizado.fornecedor,
+        equipamento: itemAtualizado.equipamento,
+        area:        itemAtualizado.area,
+        semana:      itemAtualizado.semana,
+        data:        itemAtualizado.data,
+        litros:      itemAtualizado.litros,
+        valor:       itemAtualizado.valor,
       }).eq('id', itemAtualizado.id);
     });
-  }, []);
+  }, [parametros.precoDiesel]);
 
   const handleChangePreco = useCallback(async (valor: number) => {
     setParametros(prev => ({ ...prev, precoDiesel: valor }));
@@ -151,19 +198,25 @@ export default function App() {
     await comSync(() => salvarRateios(novosRateios).then(() => {}));
   }, []);
 
+  // ── Dados realizados para orçamento ─────────────────────────────────────────
   const dadosRealizados = useMemo(() => {
     const ag: Record<string, number> = {};
-    dados.forEach(d => { ag[d.diretoria] = (ag[d.diretoria] || 0) + d.litros * parametros.precoDiesel; });
+    dados.forEach(d => {
+      ag[d.diretoria] = (ag[d.diretoria] || 0) + d.litros * parametros.precoDiesel;
+    });
     return Object.entries(ag).map(([diretoria, realizado]) => ({ diretoria, realizado }));
   }, [dados, parametros.precoDiesel]);
 
+  // ── Render das abas ──────────────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return (
           <Dashboard
-            dados={dados} orcamento={orcamento}
-            precoDiesel={parametros.precoDiesel} rateios={rateios}
+            dados={dados}
+            orcamento={orcamento}
+            precoDiesel={parametros.precoDiesel}
+            rateios={rateios}
             filtrosAtivos={filtrosAtivos}
             setFiltrosAtivos={setFiltrosAtivosComSalvar}
             filtroSelecoes={filtroSelecoes}
@@ -171,36 +224,57 @@ export default function App() {
           />
         );
       case 'base_dados':
-        return <BaseDados dados={dados} precoDiesel={parametros.precoDiesel} onDelete={handleDelete} onClearAll={handleClearAll} onEdit={handleEdit} />;
+        return (
+          <BaseDados
+            dados={dados}
+            precoDiesel={parametros.precoDiesel}
+            onDelete={handleDelete}
+            onClearAll={handleClearAll}
+            onEdit={handleEdit}
+            equipamentosCad={equipamentosCad}
+            onSaveEquipamentos={setEquipamentosCad}
+          />
+        );
       case 'orcamento':
-        return <Orcamento orcamento={orcamento} onUpdate={handleUpdateOrcamento} dadosRealizados={dadosRealizados} dados={dados} precoDiesel={parametros.precoDiesel} />;
+        return (
+          <Orcamento
+            orcamento={orcamento}
+            onUpdate={handleUpdateOrcamento}
+            dadosRealizados={dadosRealizados}
+            dados={dados}
+            precoDiesel={parametros.precoDiesel}
+          />
+        );
       case 'preenchimento':
-        return <Preenchimento onAdd={handleAdd} nextId={nextId} dados={dados} />;
+        return <Preenchimento onAdd={handleAdd} nextId={nextId} dados={dados} equipamentosCad={equipamentosCad} />;
       case 'importacao':
         return <Importacao onImport={handleImport} />;
       case 'exportacao':
         return <Exportacao dados={dados} orcamento={orcamento} precoDiesel={parametros.precoDiesel} />;
       case 'rateio':
         return <Rateio dados={dados} rateios={rateios} precoDiesel={parametros.precoDiesel} onSave={handleUpdateRateios} />;
+      case 'cadastro_equipamento':
+        return <CadastroEquipamento equipamentos={equipamentosCad} onSave={setEquipamentosCad} dados={dados} />;
+      case 'usuarios':
+        return <GerenciarUsuarios />;
       case 'parametros':
         return <Parametros precoDiesel={parametros.precoDiesel} onChangePreco={handleChangePreco} />;
       default: return null;
     }
   };
 
+  // ── Tela de carregamento ────────────────────────────────────────────────────
   if (carregando) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#1C2340' }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-2xl shadow-lg p-10 flex flex-col items-center gap-5">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
-            <Fuel className="w-8 h-8 text-white" />
-          </div>
+          className="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5">
+          <LogoStratos height={48} />
           <div className="text-center">
-            <h1 className="text-xl font-bold text-slate-800">Controle de Abastecimento</h1>
+            <h1 className="text-xl font-bold" style={{ color: '#1C2340' }}>Controle de Abastecimento</h1>
             <p className="text-sm text-slate-500 mt-1">Conectando ao banco de dados...</p>
           </div>
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#8B1E2B' }} />
         </motion.div>
       </div>
     );
@@ -208,94 +282,145 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
+      {/* Header — cor navy Stratos */}
+      <header className="sticky top-0 z-50 shadow-sm" style={{ background: '#1C2340', borderBottom: '1px solid #2A3356' }}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6">
+          <div className="flex items-center h-14 sm:h-16 gap-2 overflow-hidden">
 
-            {/* Logo + Título */}
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Fuel className="w-5 h-5 text-white" />
+            {/* Logo + Status — fixo à esquerda */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="bg-white rounded-lg px-2 py-1 flex items-center flex-shrink-0">
+                <LogoStratos height={26} soloIcone />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-base font-bold text-slate-800 leading-tight whitespace-nowrap">
-                  Controle de Abastecimento
-                </h1>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-slate-500 whitespace-nowrap hidden sm:block">
-                    Gestão de Combustível
-                  </p>
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    online ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-                  }`}>
-                    {sincronizando
-                      ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                      : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />
-                    }
-                    {sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}
-                  </div>
-                </div>
+              <div className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                online ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'
+              }`}>
+                {sincronizando
+                  ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />
+                }
+                {sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}
               </div>
             </div>
 
-            {/* Nav Desktop */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {tabs.map(tab => {
+            {/* Nav Desktop — ocupa o espaço disponível com scroll horizontal se precisar */}
+            <nav className="hidden lg:flex items-center gap-0.5 flex-1 overflow-x-auto min-w-0 scrollbar-none">
+              {tabs.filter(t => podeAcessar(t.id)).map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                      isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                    }`}>
-                    <Icon className="w-4 h-4 flex-shrink-0" />{tab.label}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                      isActive ? 'text-white' : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    }`}
+                    style={isActive ? { background: '#8B1E2B' } : {}}
+                  >
+                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />{tab.label}
                   </button>
                 );
               })}
             </nav>
 
-            <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            {/* Usuário + Logout — fixo à direita */}
+            <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+              <div className="hidden xl:flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 max-w-[160px]">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${user.role === 'admin' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className="text-xs font-medium text-slate-200 truncate">{user.nome}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${
+                  user.role === 'admin' ? 'bg-rose-900 text-rose-300' : 'bg-emerald-900 text-emerald-300'
+                }`}>
+                  {user.role === 'admin' ? 'Admin' : 'Op'}
+                </span>
+              </div>
+              <button onClick={logout} title="Sair"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap border border-white/10 flex-shrink-0">
+                <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+              <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0">
+                {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Nav Mobile */}
         <AnimatePresence>
           {menuOpen && (
-            <motion.nav initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-              className="lg:hidden border-t border-slate-200 overflow-hidden bg-white">
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="lg:hidden overflow-hidden"
+              style={{ background: '#1C2340', borderTop: '1px solid #2A3356' }}
+            >
               <div className="px-4 py-3 space-y-1">
-                {tabs.map(tab => {
+                {tabs.filter(t => podeAcessar(t.id)).map(tab => {
                   const Icon = tab.icon;
                   return (
-                    <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMenuOpen(false); }}
-                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                        activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                      }`}>
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setMenuOpen(false); }}
+                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-slate-200 hover:text-white hover:bg-white/10"
+                      style={activeTab === tab.id ? { background: '#8B1E2B', color: 'white' } : {}}
+                    >
                       <Icon className="w-4 h-4" />{tab.label}
                     </button>
                   );
                 })}
+
+                {/* Separador + info usuário + sair no mobile */}
+                <div className="pt-2 mt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg mb-1 bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${user.role === 'admin' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                      <span className="text-xs font-medium text-slate-200">{user.nome}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        user.role === 'admin' ? 'bg-rose-900 text-rose-300' : 'bg-emerald-900 text-emerald-300'
+                      }`}>
+                        {user.role === 'admin' ? 'Admin' : 'Operador'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { logout(); setMenuOpen(false); }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-white/10 hover:text-red-200 transition-all"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sair da conta
+                  </button>
+                </div>
               </div>
             </motion.nav>
           )}
         </AnimatePresence>
       </header>
 
+      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
             {renderContent()}
           </motion.div>
         </AnimatePresence>
       </main>
 
+      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
             <p>Controle de Abastecimento v1.0 — Sistema Corporativo</p>
             <p>
-              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L · {dados.length} registros ·{' '}
+              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L
+              {' · '}
+              {dados.length} registros
+              {' · '}
               <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
                 {online ? '🟢 Supabase conectado' : '🔴 Offline'}
               </span>
