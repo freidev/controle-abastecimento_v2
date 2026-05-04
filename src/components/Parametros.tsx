@@ -10,23 +10,29 @@ interface ParametrosProps {
 export default function Parametros({ precoDiesel, onChangePreco }: ParametrosProps) {
   const [inputValue, setInputValue] = useState(precoDiesel.toString());
 
+  // Sincroniza quando um botão de atalho é clicado
   useEffect(() => {
     setInputValue(precoDiesel.toString());
   }, [precoDiesel]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw     = e.target.value;
+    const raw = e.target.value;
+    // Remove zeros à esquerda, exceto "0." ou "0"
     const cleaned = raw.replace(/^0+(?=\d)/, '');
     setInputValue(cleaned);
     const num = parseFloat(cleaned);
-    if (!isNaN(num) && num > 0) onChangePreco(num);
+    if (!isNaN(num) && num > 0) {
+      onChangePreco(num);
+    }
   };
 
   const handleBlur = () => {
     const num = parseFloat(inputValue);
     if (isNaN(num) || num <= 0) {
+      // Restaura o último valor válido
       setInputValue(precoDiesel.toString());
     } else {
+      // Formata com 2 casas decimais ao sair do campo
       setInputValue(num.toFixed(2));
       onChangePreco(num);
     }
@@ -34,8 +40,11 @@ export default function Parametros({ precoDiesel, onChangePreco }: ParametrosPro
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
+      >
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
             <Settings className="w-5 h-5 text-blue-600" />
@@ -52,9 +61,8 @@ export default function Parametros({ precoDiesel, onChangePreco }: ParametrosPro
             <div>
               <p className="text-sm font-medium text-amber-800">Informação Importante</p>
               <p className="text-sm text-amber-700 mt-1">
-                O valor do diesel é utilizado em todas as fórmulas de cálculo do sistema,
-                incluindo KPIs do dashboard, valores na base de dados e comparações orçamentárias.
-                Altere com cautela.
+                O valor do diesel é utilizado em todas as fórmulas de cálculo do sistema, incluindo KPIs do dashboard,
+                valores na base de dados e comparações orçamentárias. Altere com cautela.
               </p>
             </div>
           </div>
@@ -87,12 +95,18 @@ export default function Parametros({ precoDiesel, onChangePreco }: ParametrosPro
 
             <div className="mt-4 grid grid-cols-3 gap-3">
               {[5.50, 5.89, 6.20, 6.50, 6.80, 7.00].map(valor => (
-                <button key={valor} onClick={() => { onChangePreco(valor); setInputValue(valor.toFixed(2)); }}
+                <button
+                  key={valor}
+                  onClick={() => {
+                    onChangePreco(valor);
+                    setInputValue(valor.toFixed(2));
+                  }}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     Math.abs(precoDiesel - valor) < 0.01
                       ? 'bg-blue-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}>
+                  }`}
+                >
                   R$ {valor.toFixed(2)}
                 </button>
               ))}
