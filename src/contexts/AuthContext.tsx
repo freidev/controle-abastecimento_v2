@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 export type UserRole = 'admin' | 'operador';
-export type SolicitacaoStatus = 'pendente' | 'aprovado' | 'rejeitado';
 
 export interface User {
   id: string;
@@ -19,34 +19,29 @@ export interface Solicitacao {
   login: string;
   senha: string;
   role: UserRole;
-  status: SolicitacaoStatus;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
   criadoEm: string;
   avaliadoEm?: string;
 }
 
-// ── Usuários padrão do sistema ────────────────────────────────────────────────
-const USUARIOS_PADRAO: User[] = [
-  { id: 'admin-1', nome: 'Administrador', login: 'admin', senha: 'admin123', role: 'admin', ativo: true, criadoEm: new Date().toISOString() },
-];
-
 // ── Abas permitidas por perfil ────────────────────────────────────────────────
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
-  admin: ['dashboard','base_dados','orcamento','rateio','cadastro_equipamento','preenchimento','importacao','exportacao','parametros','usuarios'],
+  admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios'],
   operador: ['preenchimento'],
 };
 
-// ── Helpers localStorage ──────────────────────────────────────────────────────
-const KEYS = { usuarios: 'auth_usuarios', solicitacoes: 'auth_solicitacoes', sessao: 'auth_sessao' };
-
-function loadUsuarios(): User[] {
-  try { const s = localStorage.getItem(KEYS.usuarios); return s ? JSON.parse(s) : USUARIOS_PADRAO; } catch { return USUARIOS_PADRAO; }
+// ── Helpers de Conversão ──────────────────────────────────────────────────────
+function mapDbUserToUser(dbUser: any): User {
+  return {
+    id: dbUser.id,
+    nome: dbUser.nome,
+    login: dbUser.login,
+    senha: dbUser.senha,
+    role: dbUser.role as UserRole,
+    ativo: dbUser.status === 'ativo',
+    criadoEm: dbUser.criado_em,
+  };
 }
-function saveUsuarios(u: User[]) { try { localStorage.setItem(KEYS.usuarios, JSON.stringify(u)); } catch { /* ignora */ } }
-
-function loadSolicitacoes(): Solicitacao[] {
-  try { const s = localStorage.getItem(KEYS.solicitacoes); return s ? JSON.parse(s) : []; } catch { return []; }
-}
-function saveSolicitacoes(s: Solicitacao[]) { try { localStorage.setItem(KEYS.solicitacoes, JSON.stringify(s)); } catch { /* ignora */ } }
 
 // ── Context ───────────────────────────────────────────────────────────────────
 interface AuthContextType {
@@ -66,78 +61,153 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,         setUser        ] = useState<User | null>(() => {
-    try { const s = sessionStorage.getItem(KEYS.sessao); return s ? JSON.parse(s) : null; } catch { return null; }
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const s = sessionStorage.getItem('auth_user');
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
   });
-  const [usuarios,      setUsuarios    ] = useState<User[]>(loadUsuarios);
-  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>(loadSolicitacoes);
+
+  const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ── Carrega dados do Supabase ao iniciar ──────────────────────────────────────
+  useEffect(() => {
+    fetchAllUsers();
+  }, []);
+
+  const fetchAllUsers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .order('criado_em', { ascending: false });
+
+    if (data && !error) {
+      // Separa usuários ativos das solicitações pendentes
+      const users = data
+        .filter(u => u.status === 'ativo')
+        .map(mapDbUserToUser);
+      
+      const requests = data
+        .filter(u => u.status === 'pendente')
+        .map(u => ({
+          id: u.id,
+          nome: u.nome,
+          login: u.login,
+          senha: u.senha,
+          role: u.role as UserRole,
+          status: 'pendente' as const,
+          criadoEm: u.criado_em,
+        }));
+
+      setUsuarios(users);
+      setSolicitacoes(requests);
+    }
+    setLoading(false);
+  };
 
   const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
+    // Busca na lista local (que vem do Supabase)
     const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
     if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
     if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa. Contate o administrador.' };
+    
     setUser(u);
-    sessionStorage.setItem(KEYS.sessao, JSON.stringify(u));
+    sessionStorage.setItem('auth_user', JSON.stringify(u));
     return { ok: true };
   }, [usuarios]);
 
   const logout = useCallback(() => {
     setUser(null);
-    sessionStorage.removeItem(KEYS.sessao);
+    sessionStorage.removeItem('auth_user');
   }, []);
 
-  const registrar = useCallback((nome: string, loginStr: string, senha: string, role: UserRole): { ok: boolean; motivo: string } => {
+  const registrar = useCallback(async (nome: string, loginStr: string, senha: string, role: UserRole): Promise<{ ok: boolean; motivo: string }> => {
+    // Verifica duplicidade local
     const loginUsado = usuarios.some(u => u.login.toLowerCase() === loginStr.toLowerCase());
-    const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase() && s.status === 'pendente');
-    if (loginUsado)  return { ok: false, motivo: 'Este usuário já existe.' };
+    const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase());
+    
+    if (loginUsado) return { ok: false, motivo: 'Este usuário já existe.' };
     if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente com este usuário.' };
 
+    // Define status: Admin entra direto, Operador fica pendente
+    const status = role === 'admin' ? 'ativo' : 'pendente';
+
+    const { error } = await supabase.from('usuarios').insert({
+      nome,
+      login: loginStr,
+      senha,
+      role,
+      status,
+    });
+
+    if (error) {
+        return { ok: false, motivo: 'Erro ao criar conta. Tente novamente.' };
+    }
+
+    // Recarrega a lista
+    fetchAllUsers();
+
     if (role === 'admin') {
-      // Admin se cadastra diretamente
-      const novoUser: User = { id: Math.random().toString(36).slice(2), nome, login: loginStr, senha, role, ativo: true, criadoEm: new Date().toISOString() };
-      const novosUsuarios = [...usuarios, novoUser];
-      setUsuarios(novosUsuarios);
-      saveUsuarios(novosUsuarios);
       return { ok: true, motivo: 'Administrador cadastrado com sucesso! Faça login.' };
     } else {
-      // Operador precisa de aprovação
-      const sol: Solicitacao = { id: Math.random().toString(36).slice(2), nome, login: loginStr, senha, role, status: 'pendente', criadoEm: new Date().toISOString() };
-      const novas = [...solicitacoes, sol];
-      setSolicitacoes(novas);
-      saveSolicitacoes(novas);
       return { ok: true, motivo: 'Solicitação enviada! Aguarde a aprovação do administrador.' };
     }
   }, [usuarios, solicitacoes]);
 
-  const aprovarSolicitacao = useCallback((id: string) => {
+  const aprovarSolicitacao = useCallback(async (id: string) => {
     const sol = solicitacoes.find(s => s.id === id);
     if (!sol) return;
-    const novoUser: User = { id: Math.random().toString(36).slice(2), nome: sol.nome, login: sol.login, senha: sol.senha, role: sol.role, ativo: true, criadoEm: new Date().toISOString() };
-    const novosUsuarios = [...usuarios, novoUser];
-    setUsuarios(novosUsuarios);
-    saveUsuarios(novosUsuarios);
-    const novas = solicitacoes.map(s => s.id === id ? { ...s, status: 'aprovado' as SolicitacaoStatus, avaliadoEm: new Date().toISOString() } : s);
-    setSolicitacoes(novas);
-    saveSolicitacoes(novas);
-  }, [solicitacoes, usuarios]);
 
-  const rejeitarSolicitacao = useCallback((id: string) => {
-    const novas = solicitacoes.map(s => s.id === id ? { ...s, status: 'rejeitado' as SolicitacaoStatus, avaliadoEm: new Date().toISOString() } : s);
-    setSolicitacoes(novas);
-    saveSolicitacoes(novas);
+    // Atualiza status para 'ativo' no Supabase
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ status: 'ativo' })
+      .eq('id', id);
+
+    if (!error) {
+      fetchAllUsers();
+    }
   }, [solicitacoes]);
 
-  const excluirUsuario = useCallback((id: string) => {
-    const novos = usuarios.filter(u => u.id !== id);
-    setUsuarios(novos);
-    saveUsuarios(novos);
-  }, [usuarios]);
+  const rejeitarSolicitacao = useCallback(async (id: string) => {
+    const sol = solicitacoes.find(s => s.id === id);
+    if (!sol) return;
 
-  const alterarSenha = useCallback((id: string, novaSenha: string) => {
-    const novos = usuarios.map(u => u.id === id ? { ...u, senha: novaSenha } : u);
-    setUsuarios(novos);
-    saveUsuarios(novos);
-  }, [usuarios]);
+    // Atualiza status para 'rejeitado' no Supabase
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ status: 'rejeitado' })
+      .eq('id', id);
+
+    if (!error) {
+      fetchAllUsers();
+    }
+  }, [solicitacoes]);
+
+  const excluirUsuario = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('usuarios')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      fetchAllUsers();
+    }
+  }, []);
+
+  const alterarSenha = useCallback(async (id: string, novaSenha: string) => {
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ senha: novaSenha })
+      .eq('id', id);
+
+    if (!error) {
+      fetchAllUsers();
+    }
+  }, []);
 
   const podeAcessar = useCallback((aba: string): boolean => {
     if (!user) return false;
