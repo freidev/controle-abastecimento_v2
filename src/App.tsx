@@ -16,18 +16,22 @@ import {
   buscarRateios, salvarRateios,
   buscarPreco, salvarPreco,
 } from './lib/db';
-import Dashboard     from './components/Dashboard';
-import BaseDados     from './components/BaseDados';
-import Parametros    from './components/Parametros';
-import Preenchimento from './components/Preenchimento';
-import Importacao    from './components/Importacao';
-import Orcamento     from './components/Orcamento';
-import Exportacao    from './components/Exportacao';
-import Rateio        from './components/Rateio';
-import CadastroEquipamento  from './components/CadastroEquipamento';
-import GerenciarUsuarios    from './components/GerenciarUsuarios';
-import Historico            from './components/Historico';
-import { useAuth } from './contexts/AuthContext';
+
+// Components
+import Dashboard              from './components/Dashboard';
+import BaseDados              from './components/BaseDados';
+import Parametros             from './components/Parametros';
+import Preenchimento          from './components/Preenchimento';
+import Importacao             from './components/Importacao';
+import Orcamento              from './components/Orcamento';
+import Exportacao             from './components/Exportacao';
+import Rateio                 from './components/Rateio';
+import CadastroEquipamento    from './components/CadastroEquipamento';
+import GerenciarUsuarios      from './components/GerenciarUsuarios';
+import Historico              from './components/Historico';
+import LogoStratos            from './components/LogoStratos';
+import Login                  from './components/Login';
+import { useAuth }            from './contexts/AuthContext';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard',             label: 'Dashboard',      icon: LayoutDashboard },
@@ -45,16 +49,14 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 
 export default function App() {
   const { user, podeAcessar } = useAuth();
-  
-  // Se não estiver logado, o AuthProvider renderiza o Login em outro lugar? 
-  // Assumindo que o App é protegido ou o Login é tratado externamente.
-  // Se o Login for um componente separado renderizado no main.tsx, isso está ok.
-  // Caso contrário, precisamos verificar se user existe aqui.
-  
+
+  // Se não estiver logado, mostra a tela de Login
+  if (!user) return <Login />;
+
   const [activeTab, setActiveTab]   = useState<TabType>('dashboard');
   const [dados, setDados]           = useState<Abastecimento[]>([]);
   const [orcamento, setOrcamento]   = useState<OrcamentoDiretoria[]>([]);
-  const [rateios, setRateios]             = useState<RateioCC[]>([]);
+  const [rateios, setRateios]       = useState<RateioCC[]>([]);
   const [equipamentosCad, setEquipamentosCad] = useState<Equipamento[]>([]);
   const [parametros, setParametros] = useState(parametrosInicial);
   const [menuOpen, setMenuOpen]     = useState(false);
@@ -106,8 +108,8 @@ export default function App() {
       ...item,
       id: nextId,
       valor: item.litros * parametros.precoDiesel,
-      usuario_responsavel: user?.nome || 'Sistema', // Registra quem fez
-      data_hora_registro: new Date().toISOString() // Registra quando
+      usuario_responsavel: user?.nome || 'Sistema',
+      data_hora_registro: new Date().toISOString()
     };
     setDados(prev => [novo, ...prev]);
     await comSync(() => adicionarAbastecimento(novo).then(() => {}));
@@ -234,9 +236,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#1C2340' }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
           className="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
-            <span className="text-white font-bold text-xl">S</span>
-          </div>
+          <LogoStratos height={60} />
           <div className="text-center">
             <h1 className="text-xl font-bold" style={{ color: '#1C2340' }}>Controle de Abastecimento</h1>
             <p className="text-sm text-slate-500 mt-1">Conectando ao banco de dados...</p>
@@ -255,7 +255,7 @@ export default function App() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="bg-white rounded-lg px-2 py-1 flex items-center flex-shrink-0">
-                 <span className="font-bold text-blue-800 text-lg">Logo</span>
+                <LogoStratos height={28} soloIcone />
               </div>
               <div className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
                 online ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'
