@@ -26,7 +26,7 @@ export interface Solicitacao {
 // ── Abas permitidas por perfil ────────────────────────────────────────────────
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
   admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios', 'historico'],
-  operador: ['preenchimento', 'historico'], // Histórico adicionado aqui
+  operador: ['preenchimento'], // O operador só pode utilizar a aba de preenchimento
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
