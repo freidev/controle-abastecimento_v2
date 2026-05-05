@@ -25,8 +25,8 @@ export interface Solicitacao {
 
 // ── Abas permitidas por perfil ────────────────────────────────────────────────
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
-  admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios'],
-  operador: ['preenchimento'],
+  admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios', 'historico'],
+  operador: ['preenchimento', 'historico'], // Histórico adicionado aqui
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Carrega dados do Supabase ──────────────────────────────────────────────
   const fetchAllUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -105,7 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchAllUsers]);
 
   const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
-    // Garante que estamos usando a lista mais recente
     const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
     if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
     if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa.' };
@@ -144,43 +142,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [usuarios, solicitacoes, fetchAllUsers]);
 
-  // ── Aprovar Solicitação (Corrigido para recarregar a lista) ────────────────
   const aprovarSolicitacao = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ status: 'ativo' })
-      .eq('id', id);
-
-    if (!error) {
-      // Recarrega a lista imediatamente para que o login funcione
-      await fetchAllUsers();
-    }
+    const { error } = await supabase.from('usuarios').update({ status: 'ativo' }).eq('id', id);
+    if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
   const rejeitarSolicitacao = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ status: 'rejeitado' })
-      .eq('id', id);
-
+    const { error } = await supabase.from('usuarios').update({ status: 'rejeitado' }).eq('id', id);
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
   const excluirUsuario = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('usuarios').delete().eq('id', id);
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
   const alterarSenha = useCallback(async (id: string, novaSenha: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ senha: novaSenha })
-      .eq('id', id);
-
+    const { error } = await supabase.from('usuarios').update({ senha: novaSenha }).eq('id', id);
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
