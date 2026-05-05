@@ -130,14 +130,16 @@ export default function App() {
 
   // ── Handlers sincronizados com Supabase ─────────────────────────────────────
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
-    const novo: Abastecimento = {
-      ...item,
-      id:    nextId,
-      valor: item.litros * parametros.precoDiesel,
-    };
-    setDados(prev => [novo, ...prev]);
-    await comSync(() => adicionarAbastecimento(novo).then(() => {}));
-  }, [nextId, parametros.precoDiesel]);
+  const novo: Abastecimento = {
+    ...item,
+    id: nextId,
+    valor: item.litros * parametros.precoDados,
+    usuario_responsavel: user?.nome || 'Sistema', // <--- REGISTRA O NOME
+    data_hora_registro: new Date().toISOString() // <--- REGistra O HORÁRIO
+  };
+  setDados(prev => [novo, ...prev]);
+  await comSync(() => adicionarAbastecimento(novo).then(() => {}));
+}, [nextId, parametros.precoDados, user]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
