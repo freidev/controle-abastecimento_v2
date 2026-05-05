@@ -2,10 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Database, Settings, FilePlus, Upload, Wallet,
-  Menu, X, FileDown, GitFork, Loader2, Wifi, WifiOff, Wrench, LogOut, Users
+  Menu, X, FileDown, GitFork, Loader2, Wifi, WifiOff, Wrench, LogOut, Users, History
 } from 'lucide-react';
-import { useAuth } from './contexts/AuthContext';
-import Login from './components/Login';
 import {
   Abastecimento, OrcamentoDiretoria, RateioCC, TabType, Equipamento,
   FiltroKey, FiltroSelecoes, FILTROS_PADRAO_KEYS, FILTRO_SELECOES_VAZIO,
@@ -13,7 +11,7 @@ import {
 import { parametrosInicial } from './data/initialData';
 import {
   buscarAbastecimentos, adicionarAbastecimento, deletarAbastecimento,
-  limparAbastecimentos,
+  limparAbastecimentos, atualizarAbastecimentos,
   buscarOrcamentos, salvarOrcamentos,
   buscarRateios, salvarRateios,
   buscarPreco, salvarPreco,
@@ -25,10 +23,11 @@ import Preenchimento from './components/Preenchimento';
 import Importacao    from './components/Importacao';
 import Orcamento     from './components/Orcamento';
 import Exportacao    from './components/Exportacao';
-import Rateio               from './components/Rateio';
+import Rateio        from './components/Rateio';
 import CadastroEquipamento  from './components/CadastroEquipamento';
 import GerenciarUsuarios    from './components/GerenciarUsuarios';
-import LogoStratos          from './components/LogoStratos';
+import Historico            from './components/Historico';
+import { useAuth } from './contexts/AuthContext';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard',             label: 'Dashboard',      icon: LayoutDashboard },
@@ -36,22 +35,23 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'orcamento',            label: 'Orçamento',       icon: Wallet          },
   { id: 'rateio',               label: 'Rateio CC',       icon: GitFork         },
   { id: 'cadastro_equipamento', label: 'Equipamentos',    icon: Wrench          },
-  { id: 'usuarios',             label: 'Usuários',        icon: Users           },
+  { id: 'historico',            label: 'Histórico',       icon: History         },
   { id: 'preenchimento',        label: 'Preenchimento',   icon: FilePlus        },
   { id: 'importacao',           label: 'Importação',      icon: Upload          },
   { id: 'exportacao',           label: 'Exportação',      icon: FileDown        },
   { id: 'parametros',           label: 'Parâmetros',      icon: Settings        },
+  { id: 'usuarios',             label: 'Usuários',        icon: Users           },
 ];
 
 export default function App() {
-  const { user, logout, podeAcessar } = useAuth();
-
-  // Se não logado, mostra tela de login
-  if (!user) return <Login />;
-
-  const [activeTab, setActiveTab]   = useState<TabType>(
-    podeAcessar('dashboard') ? 'dashboard' : 'preenchimento'
-  );
+  const { user, podeAcessar } = useAuth();
+  
+  // Se não estiver logado, o AuthProvider renderiza o Login em outro lugar? 
+  // Assumindo que o App é protegido ou o Login é tratado externamente.
+  // Se o Login for um componente separado renderizado no main.tsx, isso está ok.
+  // Caso contrário, precisamos verificar se user existe aqui.
+  
+  const [activeTab, setActiveTab]   = useState<TabType>('dashboard');
   const [dados, setDados]           = useState<Abastecimento[]>([]);
   const [orcamento, setOrcamento]   = useState<OrcamentoDiretoria[]>([]);
   const [rateios, setRateios]             = useState<RateioCC[]>([]);
@@ -62,21 +62,9 @@ export default function App() {
   const [online, setOnline]         = useState(true);
   const [sincronizando, setSincronizando] = useState(false);
 
-  // Filtros persistentes do Dashboard — salvo no localStorage para sobreviver ao reload
-  const [filtrosAtivos, setFiltrosAtivos] = useState<FiltroKey[]>(() => {
-    try {
-      const salvo = localStorage.getItem('dashboard_filtros_ativos');
-      if (salvo) {
-        const parsed = JSON.parse(salvo) as FiltroKey[];
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch { /* ignora */ }
-    return FILTROS_PADRAO_KEYS;
-  });
-
+  const [filtrosAtivos, setFiltrosAtivos] = useState<FiltroKey[]>(FILTROS_PADRAO_KEYS);
   const [filtroSelecoes, setFiltroSelecoes] = useState<FiltroSelecoes>(FILTRO_SELECOES_VAZIO);
 
-  // Salva filtrosAtivos no localStorage toda vez que mudar
   const setFiltrosAtivosComSalvar = useCallback((action: React.SetStateAction<FiltroKey[]>) => {
     setFiltrosAtivos(prev => {
       const proximo = typeof action === 'function' ? action(prev) : action;
@@ -85,31 +73,18 @@ export default function App() {
     });
   }, []);
 
-  // ── Carrega dados do Supabase na inicialização ──────────────────────────────
   useEffect(() => {
     const carregar = async () => {
       setCarregando(true);
       try {
         const [abs, orcs, rats, preco] = await Promise.all([
-          buscarAbastecimentos(),
-          buscarOrcamentos(),
-          buscarRateios(),
-          buscarPreco(),
+          buscarAbastecimentos(), buscarOrcamentos(), buscarRateios(), buscarPreco(),
         ]);
-
-        // Sempre usa exatamente o que veio do Supabase — nunca injeta dados de exemplo
-        setDados(abs);
-        setOrcamento(orcs);
-
-        setRateios(rats);
+        setDados(abs); setOrcamento(orcs); setRateios(rats);
         setParametros({ precoDiesel: preco });
         setOnline(true);
-
       } catch {
-        // Offline — usa dados do localStorage ou vazio
-        setDados([]);
-        setOrcamento([]);
-        setOnline(false);
+        setDados([]); setOrcamento([]); setOnline(false);
       } finally {
         setCarregando(false);
       }
@@ -117,42 +92,39 @@ export default function App() {
     carregar();
   }, []);
 
-  // ── Helpers de sincronização ────────────────────────────────────────────────
   const comSync = async (fn: () => Promise<void>) => {
     setSincronizando(true);
     try { await fn(); } finally { setSincronizando(false); }
   };
 
-  // ── Próximo ID ──────────────────────────────────────────────────────────────
   const nextId = useMemo(() =>
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
-  // ── Handlers sincronizados com Supabase ─────────────────────────────────────
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
-  const novo: Abastecimento = {
-    ...item,
-    id: nextId,
-    valor: item.litros * parametros.precoDados,
-    usuario_responsavel: user?.nome || 'Sistema', // <--- REGISTRA O NOME
-    data_hora_registro: new Date().toISOString() // <--- REGistra O HORÁRIO
-  };
-  setDados(prev => [novo, ...prev]);
-  await comSync(() => adicionarAbastecimento(novo).then(() => {}));
-}, [nextId, parametros.precoDados, user]);
+    const novo: Abastecimento = {
+      ...item,
+      id: nextId,
+      valor: item.litros * parametros.precoDiesel,
+      usuario_responsavel: user?.nome || 'Sistema', // Registra quem fez
+      data_hora_registro: new Date().toISOString() // Registra quando
+    };
+    setDados(prev => [novo, ...prev]);
+    await comSync(() => adicionarAbastecimento(novo).then(() => {}));
+  }, [nextId, parametros.precoDiesel, user]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
     const novos: Abastecimento[] = items.map(item => ({
       ...item,
-      id:    id++,
+      id: id++,
       valor: item.litros * parametros.precoDiesel,
+      usuario_responsavel: user?.nome || 'Sistema',
+      data_hora_registro: new Date().toISOString()
     }));
     setDados(prev => [...novos, ...prev]);
-    await comSync(async () => {
-      for (const n of novos) await adicionarAbastecimento(n);
-    });
-  }, [nextId, parametros.precoDiesel]);
+    await comSync(async () => { for (const n of novos) await adicionarAbastecimento(n); });
+  }, [nextId, parametros.precoDiesel, user]);
 
   const handleDelete = useCallback(async (id: number) => {
     setDados(prev => prev.filter(d => d.id !== id));
@@ -169,20 +141,14 @@ export default function App() {
     await comSync(async () => {
       const { supabase } = await import('./lib/supabase');
       await supabase.from('abastecimentos').update({
-        cc_novo:     itemAtualizado.ccNovo,
-        diretoria:   itemAtualizado.diretoria,
-        gerencia:    itemAtualizado.gerencia,
-        area_lot:    itemAtualizado.areaLot,
-        fornecedor:  itemAtualizado.fornecedor,
-        equipamento: itemAtualizado.equipamento,
-        area:        itemAtualizado.area,
-        semana:      itemAtualizado.semana,
-        data:        itemAtualizado.data,
-        litros:      itemAtualizado.litros,
-        valor:       itemAtualizado.valor,
+        cc_novo: itemAtualizado.ccNovo, diretoria: itemAtualizado.diretoria,
+        gerencia: itemAtualizado.gerencia, area_lot: itemAtualizado.areaLot,
+        fornecedor: itemAtualizado.fornecedor, equipamento: itemAtualizado.equipamento,
+        area: itemAtualizado.area, semana: itemAtualizado.semana,
+        data: itemAtualizado.data, litros: itemAtualizado.litros, valor: itemAtualizado.valor,
       }).eq('id', itemAtualizado.id);
     });
-  }, [parametros.precoDiesel]);
+  }, []);
 
   const handleChangePreco = useCallback(async (valor: number) => {
     setParametros(prev => ({ ...prev, precoDiesel: valor }));
@@ -200,7 +166,6 @@ export default function App() {
     await comSync(() => salvarRateios(novosRateios).then(() => {}));
   }, []);
 
-  // ── Dados realizados para orçamento ─────────────────────────────────────────
   const dadosRealizados = useMemo(() => {
     const ag: Record<string, number> = {};
     dados.forEach(d => {
@@ -209,16 +174,13 @@ export default function App() {
     return Object.entries(ag).map(([diretoria, realizado]) => ({ diretoria, realizado }));
   }, [dados, parametros.precoDiesel]);
 
-  // ── Render das abas ──────────────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return (
           <Dashboard
-            dados={dados}
-            orcamento={orcamento}
-            precoDiesel={parametros.precoDiesel}
-            rateios={rateios}
+            dados={dados} orcamento={orcamento}
+            precoDiesel={parametros.precoDiesel} rateios={rateios}
             filtrosAtivos={filtrosAtivos}
             setFiltrosAtivos={setFiltrosAtivosComSalvar}
             filtroSelecoes={filtroSelecoes}
@@ -259,19 +221,22 @@ export default function App() {
         return <CadastroEquipamento equipamentos={equipamentosCad} onSave={setEquipamentosCad} dados={dados} />;
       case 'usuarios':
         return <GerenciarUsuarios />;
+      case 'historico':
+        return <Historico />;
       case 'parametros':
         return <Parametros precoDiesel={parametros.precoDiesel} onChangePreco={handleChangePreco} />;
       default: return null;
     }
   };
 
-  // ── Tela de carregamento ────────────────────────────────────────────────────
   if (carregando) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#1C2340' }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
           className="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5">
-          <LogoStratos height={48} />
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
+            <span className="text-white font-bold text-xl">S</span>
+          </div>
           <div className="text-center">
             <h1 className="text-xl font-bold" style={{ color: '#1C2340' }}>Controle de Abastecimento</h1>
             <p className="text-sm text-slate-500 mt-1">Conectando ao banco de dados...</p>
@@ -284,28 +249,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Header — cor navy Stratos */}
       <header className="sticky top-0 z-50 shadow-sm" style={{ background: '#1C2340', borderBottom: '1px solid #2A3356' }}>
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
-          <div className="flex items-center h-14 sm:h-16 gap-2 overflow-hidden">
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-2 overflow-hidden">
 
-            {/* Logo + Status — fixo à esquerda */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="bg-white rounded-lg px-2 py-1 flex items-center flex-shrink-0">
-                <LogoStratos height={26} soloIcone />
+                 <span className="font-bold text-blue-800 text-lg">Logo</span>
               </div>
-              <div className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+              <div className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
                 online ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'
               }`}>
-                {sincronizando
-                  ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                  : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />
-                }
-                {sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}
+                {sincronizando ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                <span>{sincronizando ? 'Salvando...' : online ? 'Online' : 'Offline'}</span>
               </div>
             </div>
 
-            {/* Nav Desktop — ocupa o espaço disponível com scroll horizontal se precisar */}
             <nav className="hidden lg:flex items-center gap-0.5 flex-1 overflow-x-auto min-w-0 scrollbar-none">
               {tabs.filter(t => podeAcessar(t.id)).map(tab => {
                 const Icon = tab.icon;
@@ -323,18 +282,17 @@ export default function App() {
               })}
             </nav>
 
-            {/* Usuário + Logout — fixo à direita */}
             <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
               <div className="hidden xl:flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-white/10 bg-white/5 max-w-[160px]">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${user.role === 'admin' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-                <span className="text-xs font-medium text-slate-200 truncate">{user.nome}</span>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${user?.role === 'admin' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className="text-xs font-medium text-slate-200 truncate">{user?.nome}</span>
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${
-                  user.role === 'admin' ? 'bg-rose-900 text-rose-300' : 'bg-emerald-900 text-emerald-300'
+                  user?.role === 'admin' ? 'bg-rose-900 text-rose-300' : 'bg-emerald-900 text-emerald-300'
                 }`}>
-                  {user.role === 'admin' ? 'Admin' : 'Op'}
+                  {user?.role === 'admin' ? 'Admin' : 'Op'}
                 </span>
               </div>
-              <button onClick={logout} title="Sair"
+              <button onClick={() => window.location.reload()} title="Sair"
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap border border-white/10 flex-shrink-0">
                 <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="hidden sm:inline">Sair</span>
@@ -346,7 +304,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Nav Mobile */}
         <AnimatePresence>
           {menuOpen && (
             <motion.nav
@@ -370,27 +327,10 @@ export default function App() {
                     </button>
                   );
                 })}
-
-                {/* Separador + info usuário + sair no mobile */}
-                <div className="pt-2 mt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between px-3 py-2 rounded-lg mb-1 bg-white/5">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${user.role === 'admin' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-                      <span className="text-xs font-medium text-slate-200">{user.nome}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                        user.role === 'admin' ? 'bg-rose-900 text-rose-300' : 'bg-emerald-900 text-emerald-300'
-                      }`}>
-                        {user.role === 'admin' ? 'Admin' : 'Operador'}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { logout(); setMenuOpen(false); }}
-                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-white/10 hover:text-red-200 transition-all"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sair da conta
-                  </button>
+                <div className="pt-2 mt-2 border-t border-white/10">
+                   <button onClick={() => window.location.reload()} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-white/10">
+                     <LogOut className="w-4 h-4" /> Sair da conta
+                   </button>
                 </div>
               </div>
             </motion.nav>
@@ -398,7 +338,6 @@ export default function App() {
         </AnimatePresence>
       </header>
 
-      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div
@@ -413,16 +352,12 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
             <p>Controle de Abastecimento v1.0 — Sistema Corporativo</p>
             <p>
-              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L
-              {' · '}
-              {dados.length} registros
-              {' · '}
+              Preço Diesel: R$ {parametros.precoDiesel.toFixed(2)}/L · {dados.length} registros ·{' '}
               <span className={online ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
                 {online ? '🟢 Supabase conectado' : '🔴 Offline'}
               </span>
