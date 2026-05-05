@@ -29,7 +29,7 @@ export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
   operador: ['preenchimento'],
 };
 
-// ── Helpers de Conversão ──────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function mapDbUserToUser(dbUser: any): User {
   return {
     id: dbUser.id,
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Carrega dados do Supabase ao iniciar ──────────────────────────────────────
+  // ── Carrega dados do Supabase ──────────────────────────────────────────────
   const fetchAllUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -105,9 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchAllUsers]);
 
   const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
+    // Garante que estamos usando a lista mais recente
     const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
     if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
-    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa. Contate o administrador.' };
+    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa.' };
     
     setUser(u);
     sessionStorage.setItem('auth_user', JSON.stringify(u));
@@ -119,32 +120,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('auth_user');
   }, []);
 
-  // ── Registrar (Agora é Async/Await para funcionar corretamente) ─────────────
   const registrar = useCallback(async (nome: string, loginStr: string, senha: string, role: UserRole): Promise<{ ok: boolean; motivo: string }> => {
-    // 1. Verifica duplicidade no estado local (mais rápido)
     const loginUsado = usuarios.some(u => u.login.toLowerCase() === loginStr.toLowerCase());
     const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase());
     
     if (loginUsado) return { ok: false, motivo: 'Este usuário já existe.' };
     if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente.' };
 
-    // 2. Define status
     const status = role === 'admin' ? 'ativo' : 'pendente';
 
-    // 3. Insere no Supabase
     const { error } = await supabase.from('usuarios').insert({
-      nome,
-      login: loginStr,
-      senha,
-      role,
-      status,
+      nome, login: loginStr, senha, role, status,
     });
 
-    if (error) {
-      return { ok: false, motivo: 'Erro de conexão. Tente novamente.' };
-    }
+    if (error) return { ok: false, motivo: 'Erro ao criar conta.' };
 
-    // 4. Recarrega a lista imediatamente para mostrar a solicitação ao Admin
     await fetchAllUsers();
 
     if (role === 'admin') {
@@ -154,23 +144,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [usuarios, solicitacoes, fetchAllUsers]);
 
+  // ── Aprovar Solicitação (Corrigido para recarregar a lista) ────────────────
   const aprovarSolicitacao = useCallback(async (id: string) => {
-    const { error } = await supabase.from('usuarios').update({ status: 'ativo' }).eq('id', id);
-    if (!error) await fetchAllUsers();
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ status: 'ativo' })
+      .eq('id', id);
+
+    if (!error) {
+      // Recarrega a lista imediatamente para que o login funcione
+      await fetchAllUsers();
+    }
   }, [fetchAllUsers]);
 
   const rejeitarSolicitacao = useCallback(async (id: string) => {
-    const { error } = await supabase.from('usuarios').update({ status: 'rejeitado' }).eq('id', id);
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ status: 'rejeitado' })
+      .eq('id', id);
+
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
   const excluirUsuario = useCallback(async (id: string) => {
-    const { error } = await supabase.from('usuarios').delete().eq('id', id);
+    const { error } = await supabase
+      .from('usuarios')
+      .delete()
+      .eq('id', id);
+
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
   const alterarSenha = useCallback(async (id: string, novaSenha: string) => {
-    const { error } = await supabase.from('usuarios').update({ senha: novaSenha }).eq('id', id);
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ senha: novaSenha })
+      .eq('id', id);
+
     if (!error) await fetchAllUsers();
   }, [fetchAllUsers]);
 
