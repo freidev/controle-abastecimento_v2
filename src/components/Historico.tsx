@@ -55,6 +55,8 @@ export default function Historico() {
     return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       {/* Header */}
@@ -143,8 +145,4 @@ export default function Historico() {
       </motion.div>
     </div>
   );
-}
-
-function formatCurrency(v: number) {
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
