@@ -53,7 +53,12 @@ export default function App() {
   // Se não estiver logado, mostra a tela de Login
   if (!user) return <Login />;
 
-  const [activeTab, setActiveTab]   = useState<TabType>('dashboard');
+  const getInitialTab = () => {
+    if (user.role === 'operador') return 'preenchimento';
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTab]   = useState<TabType>(getInitialTab());
   const [dados, setDados]           = useState<Abastecimento[]>([]);
   const [orcamento, setOrcamento]   = useState<OrcamentoDiretoria[]>([]);
   const [rateios, setRateios]       = useState<RateioCC[]>([]);
