@@ -46,7 +46,6 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function App() {
-  // Garante acesso à função logout e validação de rotas
   const { user, podeAcessar, logout } = useAuth();
 
   // Se não estiver logado, mostra a tela de Login
@@ -108,13 +107,16 @@ export default function App() {
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
-  // Salva o nome do usuário logado ao criar
+  // CORREÇÃO: Garante que o nome do usuário logado é salvo corretamente
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
+    // Garante que pegamos o nome do usuário atual
+    const nomeUsuario = user?.nome || 'Sistema';
+    
     const novo: Abastecimento = {
       ...item,
       id: nextId,
       valor: item.litros * parametros.precoDiesel,
-      usuario_responsavel: user?.nome || 'Sistema',
+      usuario_responsavel: nomeUsuario, // Salva o nome corretamente
       data_hora_registro: new Date().toISOString()
     };
     setDados(prev => [novo, ...prev]);
@@ -123,11 +125,12 @@ export default function App() {
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
+    const nomeUsuario = user?.nome || 'Sistema';
     const novos: Abastecimento[] = items.map(item => ({
       ...item,
       id: id++,
       valor: item.litros * parametros.precoDiesel,
-      usuario_responsavel: user?.nome || 'Sistema',
+      usuario_responsavel: nomeUsuario,
       data_hora_registro: new Date().toISOString()
     }));
     setDados(prev => [...novos, ...prev]);
@@ -298,7 +301,6 @@ export default function App() {
                   {user?.role === 'admin' ? 'Admin' : 'Op'}
                 </span>
               </div>
-              {/* Botão Sair funcional */}
               <button onClick={logout} title="Sair"
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap border border-white/10 flex-shrink-0">
                 <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
