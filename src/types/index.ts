@@ -44,7 +44,7 @@ export interface ParametrosSistema {
   precoDiesel: number;
 }
 
-// ESTA É A INTERFACE QUE O APP ESTÁ PROCURANDO E NÃO ACHANDO
+// Interface que o App.tsx estava procurando
 export interface Equipamento {
   id: string;
   equipamento: string;
