@@ -59,7 +59,6 @@ export default function Historico() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      {/* Header */}
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -82,7 +81,6 @@ export default function Historico() {
         </div>
       </motion.div>
 
-      {/* Tabela */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
