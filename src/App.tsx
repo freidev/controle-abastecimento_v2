@@ -125,18 +125,21 @@ export default function App() {
 }, [nextId, parametros.precoDiesel, user]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
-    let id = nextId;
-    const nomeUsuario = user?.nome || 'Sistema';
-    const novos: Abastecimento[] = items.map(item => ({
-      ...item,
-      id: id++,
-      valor: item.litros * parametros.precoDiesel,
-      usuario_responsavel: nomeUsuario,
-      data_hora_registro: new Date().toISOString()
-    }));
-    setDados(prev => [...novos, ...prev]);
-    await comSync(async () => { for (const n of novos) await adicionarAbastecimento(n); });
-  }, [nextId, parametros.precoDiesel, user]);
+  const usuarioAtual = JSON.parse(sessionStorage.getItem('auth_user') || '{}');
+  const nomeUsuario = usuarioAtual?.nome || user?.nome || user?.login || 'Sistema';
+
+  let id = nextId;
+  const novos: Abastecimento[] = items.map(item => ({
+    ...item,
+    id: id++,
+    valor: item.litros * parametros.precoDiesel,
+    usuario_responsavel: nomeUsuario,
+    data_hora_registro: new Date().toISOString()
+  }));
+
+  setDados(prev => [...novos, ...prev]);
+  await comSync(async () => { for (const n of novos) await adicionarAbastecimento(n); });
+}, [nextId, parametros.precoDiesel, user]);
 
   const handleDelete = useCallback(async (id: number) => {
     setDados(prev => prev.filter(d => d.id !== id));
