@@ -108,20 +108,21 @@ export default function App() {
   , [dados]);
 
   // CORREÇÃO: Garante que o nome do usuário logado é salvo corretamente
-  const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
-    // Garante que pegamos o nome do usuário atual
-    const nomeUsuario = user?.nome || 'Sistema';
-    
-    const novo: Abastecimento = {
-      ...item,
-      id: nextId,
-      valor: item.litros * parametros.precoDiesel,
-      usuario_responsavel: nomeUsuario, // Salva o nome corretamente
-      data_hora_registro: new Date().toISOString()
-    };
-    setDados(prev => [novo, ...prev]);
-    await comSync(() => adicionarAbastecimento(novo).then(() => {}));
-  }, [nextId, parametros.precoDiesel, user]);
+ const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
+  const usuarioAtual = JSON.parse(sessionStorage.getItem('auth_user') || '{}');
+  const nomeUsuario = usuarioAtual?.nome || user?.nome || user?.login || 'Sistema';
+
+  const novo: Abastecimento = {
+    ...item,
+    id: nextId,
+    valor: item.litros * parametros.precoDiesel,
+    usuario_responsavel: nomeUsuario,
+    data_hora_registro: new Date().toISOString()
+  };
+
+  setDados(prev => [novo, ...prev]);
+  await comSync(() => adicionarAbastecimento(novo).then(() => {}));
+}, [nextId, parametros.precoDiesel, user]);
 
   const handleImport = useCallback(async (items: Omit<Abastecimento, 'id' | 'valor'>[]) => {
     let id = nextId;
