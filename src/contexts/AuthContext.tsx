@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { supabase } from '../lib/supabase';
 
 export type UserRole = 'admin' | 'operador';
-export type SolicitacaoStatus = 'pendente' | 'aprovado' | 'rejeitado';
+export type UserStatus = 'pendente' | 'aprovado' | 'rejeitado' | 'ativo';
 
 export interface User {
   id: string;
@@ -12,7 +12,6 @@ export interface User {
   role: UserRole;
   ativo: boolean;
   criadoEm: string;
-  principal?: boolean;
 }
 
 export interface Solicitacao {
@@ -21,28 +20,17 @@ export interface Solicitacao {
   login: string;
   senha: string;
   role: UserRole;
-  status: SolicitacaoStatus;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
   criadoEm: string;
-  avaliadoEm?: string;
 }
 
+// ── Abas permitidas por perfil ────────────────────────────────────────────────
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
-  admin: [
-    'dashboard',
-    'base_dados',
-    'orcamento',
-    'rateio',
-    'cadastro_equipamento',
-    'preenchimento',
-    'importacao',
-    'exportacao',
-    'parametros',
-    'usuarios',
-    'historico',
-  ],
-  operador: ['preenchimento'],
+  admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios', 'historico'],
+  operador: ['preenchimento', 'historico'],
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function mapDbUserToUser(dbUser: any): User {
   return {
     id: dbUser.id,
@@ -50,12 +38,12 @@ function mapDbUserToUser(dbUser: any): User {
     login: dbUser.login,
     senha: dbUser.senha,
     role: dbUser.role as UserRole,
-    ativo: dbUser.status === 'ativo',
+    ativo: dbUser.status === 'ativo' || dbUser.status === 'aprovado',
     criadoEm: dbUser.criado_em,
-    principal: dbUser.login === 'admin',
   };
 }
 
+// ── Context ───────────────────────────────────────────────────────────────────
 interface AuthContextType {
   user: User | null;
   usuarios: User[];
@@ -64,12 +52,11 @@ interface AuthContextType {
   login: (loginStr: string, senha: string) => { ok: boolean; motivo?: string };
   logout: () => void;
   registrar: (nome: string, loginStr: string, senha: string, role: UserRole) => Promise<{ ok: boolean; motivo: string }>;
-  aprovarSolicitacao: (id: string) => Promise<{ ok: boolean; motivo?: string }>;
-  rejeitarSolicitacao: (id: string) => Promise<{ ok: boolean; motivo?: string }>;
+  aprovarSolicitacao: (id: string) => Promise<void>;
+  rejeitarSolicitacao: (id: string) => Promise<void>;
   excluirUsuario: (id: string) => Promise<void>;
   alterarSenha: (id: string, novaSenha: string) => Promise<void>;
   podeAcessar: (aba: string) => boolean;
-  isAdminPrincipal: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -79,9 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const s = sessionStorage.getItem('auth_user');
       return s ? JSON.parse(s) : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   });
 
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -90,17 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchAllUsers = useCallback(async () => {
     setLoading(true);
-
     const { data, error } = await supabase
       .from('usuarios')
       .select('*')
       .order('criado_em', { ascending: false });
 
     if (data && !error) {
-      const users = data
-        .filter(u => u.status === 'ativo')
-        .map(mapDbUserToUser);
-
+      const users = data.filter(u => u.status === 'ativo' || u.status === 'aprovado').map(mapDbUserToUser);
       const requests = data
         .filter(u => u.status === 'pendente')
         .map(u => ({
@@ -116,7 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsuarios(users);
       setSolicitacoes(requests);
     }
-
     setLoading(false);
   }, []);
 
@@ -125,13 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchAllUsers]);
 
   const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
-    const u = usuarios.find(
-      u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha
-    );
-
+    const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
     if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
-    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa.' };
-
+    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa ou pendente de aprovação.' };
+    
     setUser(u);
     sessionStorage.setItem('auth_user', JSON.stringify(u));
     return { ok: true };
@@ -142,63 +119,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('auth_user');
   }, []);
 
-  const registrar = useCallback(async (
-    nome: string,
-    loginStr: string,
-    senha: string,
-    role: UserRole
-  ): Promise<{ ok: boolean; motivo: string }> => {
+  const registrar = useCallback(async (nome: string, loginStr: string, senha: string, role: UserRole): Promise<{ ok: boolean; motivo: string }> => {
     const loginUsado = usuarios.some(u => u.login.toLowerCase() === loginStr.toLowerCase());
     const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase());
-
+    
     if (loginUsado) return { ok: false, motivo: 'Este usuário já existe.' };
-    if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente.' };
+    if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente com este usuário.' };
 
-    // ✅ Nova regra:
-    // - admin principal "admin" entra direto pois já existe no banco
-    // - qualquer NOVO admin fica pendente
-    // - operador também fica pendente
-    const status = 'pendente';
-
+    // TODOS os novos cadastros (admin e operador) ficam como 'pendente'
     const { error } = await supabase.from('usuarios').insert({
       nome,
       login: loginStr,
       senha,
       role,
-      status,
+      status: 'pendente', // Sempre pendente para aprovação
     });
 
-    if (error) return { ok: false, motivo: 'Erro ao criar conta.' };
+    if (error) return { ok: false, motivo: 'Erro ao criar conta. Tente novamente.' };
 
     await fetchAllUsers();
 
-    if (role === 'admin') {
-      return {
-        ok: true,
-        motivo: 'Solicitação de administrador enviada! Aguarde a aprovação do Administrador Principal.',
-      };
-    }
-
-    return {
-      ok: true,
-      motivo: 'Solicitação enviada! Aguarde aprovação de um administrador.',
+    return { 
+      ok: true, 
+      motivo: 'Solicitação enviada! Aguarde a aprovação do administrador.' 
     };
   }, [usuarios, solicitacoes, fetchAllUsers]);
 
-  const aprovarSolicitacao = useCallback(async (id: string): Promise<{ ok: boolean; motivo?: string }> => {
-    const solicitacao = solicitacoes.find(s => s.id === id);
-    if (!solicitacao) return { ok: false, motivo: 'Solicitação não encontrada.' };
+  const aprovarSolicitacao = useCallback(async (id: string) => {
+    const sol = solicitacoes.find(s => s.id === id);
+    if (!sol) return;
 
-    // ✅ Regra:
-    // novos administradores só podem ser aprovados pelo admin principal
-    if (
-      solicitacao.role === 'admin' &&
-      user?.login !== 'admin'
-    ) {
-      return {
-        ok: false,
-        motivo: 'Somente o Administrador Principal pode aprovar novos administradores.',
-      };
+    // Verifica se é aprovação de admin e se o usuário logado é o admin principal
+    if (sol.role === 'admin' && user?.login !== 'admin') {
+      return; // Apenas o admin principal pode aprovar novos admins
     }
 
     const { error } = await supabase
@@ -206,26 +159,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .update({ status: 'ativo' })
       .eq('id', id);
 
-    if (error) {
-      return { ok: false, motivo: 'Erro ao aprovar solicitação.' };
+    if (!error) {
+      await fetchAllUsers();
     }
+  }, [solicitacoes, fetchAllUsers, user]);
 
-    await fetchAllUsers();
-    return { ok: true };
-  }, [fetchAllUsers, solicitacoes, user]);
+  const rejeitarSolicitacao = useCallback(async (id: string) => {
+    const sol = solicitacoes.find(s => s.id === id);
+    if (!sol) return;
 
-  const rejeitarSolicitacao = useCallback(async (id: string): Promise<{ ok: boolean; motivo?: string }> => {
-    const solicitacao = solicitacoes.find(s => s.id === id);
-    if (!solicitacao) return { ok: false, motivo: 'Solicitação não encontrada.' };
-
-    if (
-      solicitacao.role === 'admin' &&
-      user?.login !== 'admin'
-    ) {
-      return {
-        ok: false,
-        motivo: 'Somente o Administrador Principal pode rejeitar novos administradores.',
-      };
+    // Verifica se é rejeição de admin e se o usuário logado é o admin principal
+    if (sol.role === 'admin' && user?.login !== 'admin') {
+      return; // Apenas o admin principal pode rejeitar novos admins
     }
 
     const { error } = await supabase
@@ -233,13 +178,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .update({ status: 'rejeitado' })
       .eq('id', id);
 
-    if (error) {
-      return { ok: false, motivo: 'Erro ao rejeitar solicitação.' };
+    if (!error) {
+      await fetchAllUsers();
     }
-
-    await fetchAllUsers();
-    return { ok: true };
-  }, [fetchAllUsers, solicitacoes, user]);
+  }, [solicitacoes, fetchAllUsers, user]);
 
   const excluirUsuario = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -247,7 +189,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .delete()
       .eq('id', id);
 
-    if (!error) await fetchAllUsers();
+    if (!error) {
+      await fetchAllUsers();
+    }
   }, [fetchAllUsers]);
 
   const alterarSenha = useCallback(async (id: string, novaSenha: string) => {
@@ -256,7 +200,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .update({ senha: novaSenha })
       .eq('id', id);
 
-    if (!error) await fetchAllUsers();
+    if (!error) {
+      await fetchAllUsers();
+    }
   }, [fetchAllUsers]);
 
   const podeAcessar = useCallback((aba: string): boolean => {
@@ -264,26 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return ABAS_PERMITIDAS[user.role].includes(aba);
   }, [user]);
 
-  const isAdminPrincipal = user?.login === 'admin';
-
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        usuarios,
-        solicitacoes,
-        loading,
-        login,
-        logout,
-        registrar,
-        aprovarSolicitacao,
-        rejeitarSolicitacao,
-        excluirUsuario,
-        alterarSenha,
-        podeAcessar,
-        isAdminPrincipal,
-      }}
-    >
+    <AuthContext.Provider value={{ user, usuarios, solicitacoes, loading, login, logout, registrar, aprovarSolicitacao, rejeitarSolicitacao, excluirUsuario, alterarSenha, podeAcessar }}>
       {children}
     </AuthContext.Provider>
   );
