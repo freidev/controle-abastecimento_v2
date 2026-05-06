@@ -29,20 +29,27 @@ export async function buscarAbastecimentos(): Promise<Abastecimento[]> {
 
 export async function adicionarAbastecimento(item: Abastecimento): Promise<boolean> {
   const { error } = await supabase.from('abastecimentos').insert({
-    id:          item.id,
-    cc_novo:     item.ccNovo,
-    diretoria:   item.diretoria,
-    gerencia:    item.gerencia,
-    area_lot:    item.areaLot,
-    fornecedor:  item.fornecedor,
+    id: item.id,
+    cc_novo: item.ccNovo,
+    diretoria: item.diretoria,
+    gerencia: item.gerencia,
+    area_lot: item.areaLot,
+    fornecedor: item.fornecedor,
     equipamento: item.equipamento,
-    area:        item.area,
-    semana:      item.semana,
-    data:        item.data,
-    litros:      item.litros,
-    valor:       item.valor,
+    area: item.area,
+    semana: item.semana,
+    data: item.data,
+    litros: item.litros,
+    valor: item.valor,
+    usuario_responsavel: item.usuario_responsavel ?? 'Sistema',
+    data_hora_registro: item.data_hora_registro ?? new Date().toISOString(),
   });
-  if (error) { console.error('Erro ao adicionar abastecimento:', error); return false; }
+
+  if (error) {
+    console.error('❌ Erro ao adicionar abastecimento:', error);
+    return false;
+  }
+
   return true;
 }
 
