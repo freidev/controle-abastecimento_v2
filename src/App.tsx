@@ -16,8 +16,6 @@ import {
   buscarRateios, salvarRateios,
   buscarPreco, salvarPreco,
 } from './lib/db';
-
-// Components
 import Dashboard              from './components/Dashboard';
 import BaseDados              from './components/BaseDados';
 import Parametros             from './components/Parametros';
@@ -53,6 +51,7 @@ export default function App() {
   // Se não estiver logado, mostra a tela de Login
   if (!user) return <Login />;
 
+  // CORREÇÃO: Define a aba inicial baseada no perfil (Operador vai direto para Preenchimento)
   const getInitialTab = () => {
     if (user.role === 'operador') return 'preenchimento';
     return 'dashboard';
@@ -108,6 +107,7 @@ export default function App() {
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
+  // CORREÇÃO: Garante que o nome do usuário logado é salvo corretamente
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
     const novo: Abastecimento = {
       ...item,
