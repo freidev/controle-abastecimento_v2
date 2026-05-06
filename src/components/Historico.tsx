@@ -37,7 +37,7 @@ export default function Historico() {
         equipamento: r.equipamento || 'N/A',
         litros: r.litros || 0,
         valor: r.valor || 0,
-        usuario_responsavel: r.usuario_responsavel || 'Sistema',
+        usuario_responsavel: r.usuario_responsavel?.trim() || 'Sistema',
         data_hora_registro: r.data_hora_registro,
         data_abastecimento: r.data,
       })));
