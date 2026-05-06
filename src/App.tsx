@@ -253,6 +253,8 @@ export default function App() {
   };
 
   if (!user) return <Login />;
+
+  if (carregando)  {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#1C2340' }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
