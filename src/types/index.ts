@@ -11,7 +11,7 @@ export interface Abastecimento {
   data: string;
   litros: number;
   valor: number;
-  // Campos adicionais para histórico de quem fez
+  // Campos para histórico
   usuario_responsavel?: string;
   data_hora_registro?: string;
 }
@@ -44,6 +44,7 @@ export interface ParametrosSistema {
   precoDiesel: number;
 }
 
+// Definição da interface Equipamento que estava faltando
 export interface Equipamento {
   id: string;
   equipamento: string;
