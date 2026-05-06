@@ -23,13 +23,12 @@ export interface Solicitacao {
   criadoEm: string;
 }
 
-// ── Abas permitidas por perfil ────────────────────────────────────────────────
+// Permissões estritas: Operador só vê 'preenchimento'
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
   admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios', 'historico'],
-  operador: ['preenchimento'], // O operador só pode utilizar a aba de preenchimento
+  operador: ['preenchimento'],
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 function mapDbUserToUser(dbUser: any): User {
   return {
     id: dbUser.id,
@@ -42,7 +41,6 @@ function mapDbUserToUser(dbUser: any): User {
   };
 }
 
-// ── Context ───────────────────────────────────────────────────────────────────
 interface AuthContextType {
   user: User | null;
   usuarios: User[];
