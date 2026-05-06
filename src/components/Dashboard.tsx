@@ -62,19 +62,21 @@ function MultiSelect({ label, opcoes, selecionados, onChange, onRemove, mono, pl
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const safeOpcoes = opcoes || [];
+  
   const opcoesFiltradas = useMemo(
-    () => opcoes.filter(o => o.toLowerCase().includes(busca.toLowerCase())),
-    [opcoes, busca]
+    () => safeOpcoes.filter(o => o.toLowerCase().includes(busca.toLowerCase())),
+    [safeOpcoes, busca]
   );
 
   const toggle = (val: string) =>
     onChange(selecionados.includes(val) ? selecionados.filter(s => s !== val) : [...selecionados, val]);
 
   const toggleTodos = () =>
-    onChange(selecionados.length === opcoes.length ? [] : [...opcoes]);
+    onChange(selecionados.length === safeOpcoes.length ? [] : [...safeOpcoes]);
 
-  const todosChecked   = selecionados.length === opcoes.length && opcoes.length > 0;
-  const parcialChecked = selecionados.length > 0 && selecionados.length < opcoes.length;
+  const todosChecked   = selecionados.length === safeOpcoes.length && safeOpcoes.length > 0;
+  const parcialChecked = selecionados.length > 0 && selecionados.length < safeOpcoes.length;
 
   const btnLabel =
     selecionados.length === 0 ? (placeholder ?? 'Todos') :
@@ -134,7 +136,7 @@ function MultiSelect({ label, opcoes, selecionados, onChange, onRemove, mono, pl
             className="absolute z-50 top-full mt-1 left-0 w-60 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
           >
             {/* Busca */}
-            {opcoes.length > 6 && (
+            {safeOpcoes.length > 6 && (
               <div className="p-2 border-b border-slate-100">
                 <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg">
                   <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
@@ -173,7 +175,7 @@ function MultiSelect({ label, opcoes, selecionados, onChange, onRemove, mono, pl
                 <span className="text-xs font-semibold text-slate-600">
                   {todosChecked ? 'Desmarcar todos' : 'Selecionar todos'}
                 </span>
-                <span className="ml-auto text-xs text-slate-400">{opcoes.length}</span>
+                <span className="ml-auto text-xs text-slate-400">{safeOpcoes.length}</span>
               </button>
             </div>
 
@@ -364,6 +366,8 @@ export default function Dashboard({
     });
   }, [setFiltrosAtivos, setFiltroSelecoes]);
 
+  const getUnique = (arr: any[]) => [...new Set(arr.filter(Boolean))].sort();
+
   const opcoes = useMemo(() => {
     const MESES = [
       '01 - Janeiro', '02 - Fevereiro', '03 - Março',
@@ -372,26 +376,26 @@ export default function Dashboard({
       '10 - Outubro', '11 - Novembro',  '12 - Dezembro',
     ];
 
-    const anos = [...new Set(dados.map(d => new Date(d.data).getFullYear().toString()))].sort((a,b) => Number(b) - Number(a));
-    const meses = [...new Set(dados.map(d => {
+    const anos = getUnique(dados.map(d => new Date(d.data).getFullYear().toString()));
+    const meses = getUnique(dados.map(d => {
       const m = new Date(d.data).getMonth();
       return MESES[m];
-    }))].sort((a, b) => Number(a.split(' ')[0]) - Number(b.split(' ')[0]));
-    const dias = [...new Set(dados.map(d => {
+    }));
+    const dias = getUnique(dados.map(d => {
       const dia = new Date(d.data).getDate();
       return String(dia).padStart(2, '0');
-    }))].sort((a,b) => Number(a) - Number(b));
-    const semanas = [...new Set(dados.map(d => String(d.semana)))].filter(s => ['1','2','3','4','5'].includes(s)).sort((a,b) => Number(a) - Number(b));
+    }));
+    const semanas = getUnique(dados.map(d => String(d.semana)));
 
     return {
       ano, mes, dia, semana: semanas,
-      diretoria:   [...new Set(dados.map(d => d.diretoria))].sort(),
-      gerencia:    [...new Set(dados.map(d => d.gerencia))].sort(),
-      areaLot:     [...new Set(dados.map(d => d.areaLot))].sort(),
-      equipamento: [...new Set(dados.map(d => d.equipamento))].sort(),
-      ccNovo:      [...new Set(dados.map(d => d.ccNovo).filter(Boolean))].sort(),
-      fornecedor:  [...new Set(dados.map(d => d.fornecedor))].sort(),
-      area:        [...new Set(dados.map(d => d.area))].sort(),
+      diretoria:   getUnique(dados.map(d => d.diretoria)),
+      gerencia:    getUnique(dados.map(d => d.gerencia)),
+      areaLot:     getUnique(dados.map(d => d.areaLot)),
+      equipamento: getUnique(dados.map(d => d.equipamento)),
+      ccNovo:      getUnique(dados.map(d => d.ccNovo)),
+      fornecedor:  getUnique(dados.map(d => d.fornecedor)),
+      area:        getUnique(dados.map(d => d.area)),
     };
   }, [dados]);
 
@@ -403,7 +407,10 @@ export default function Dashboard({
       '10 - Outubro', '11 - Novembro',  '12 - Dezembro',
     ];
     return dados.filter(d => {
+      if (!d.data) return false;
       const dataObj = new Date(d.data);
+      if (isNaN(dataObj.getTime())) return false;
+      
       const anoStr  = dataObj.getFullYear().toString();
       const mesIdx  = dataObj.getMonth();
       const mesStr  = MESES_F[mesIdx];
@@ -415,34 +422,34 @@ export default function Dashboard({
       if (selecoes.dia.length         && !selecoes.dia.includes(diaStr))                     return false;
       if (selecoes.semana.length      && !selecoes.semana.includes(semanaStr))               return false;
       if (selecoes.diretoria.length   && !selecoes.diretoria.includes(d.diretoria))          return false;
-      if (selecoes.gerencia.length    && !selecoes.gerencia.includes(d.gerencia))            return false;
-      if (selecoes.areaLot.length     && !selecoes.areaLot.includes(d.areaLot))              return false;
-      if (selecoes.equipamento.length && !selecoes.equipamento.includes(d.equipamento))      return false;
-      if (selecoes.ccNovo.length      && !selecoes.ccNovo.includes(d.ccNovo))                return false;
-      if (selecoes.fornecedor.length  && !selecoes.fornecedor.includes(d.fornecedor))        return false;
-      if (selecoes.area.length        && !selecoes.area.includes(d.area))                    return false;
+      if (selecoes.gerencia.length    && !selecoes.gerencia.includes(d.gerencia || ''))      return false;
+      if (selecoes.areaLot.length     && !selecoes.areaLot.includes(d.areaLot || ''))        return false;
+      if (selecoes.equipamento.length && !selecoes.equipamento.includes(d.equipamento || ''))return false;
+      if (selecoes.ccNovo.length      && !selecoes.ccNovo.includes(d.ccNovo || ''))          return false;
+      if (selecoes.fornecedor.length  && !selecoes.fornecedor.includes(d.fornecedor || ''))  return false;
+      if (selecoes.area.length        && !selecoes.area.includes(d.area || ''))              return false;
       return true;
     });
   }, [dados, selecoes]);
 
-  const totalLitros = useMemo(() => dadosFiltrados.reduce((acc, d) => acc + d.litros, 0), [dadosFiltrados]);
-  const valorTotal  = totalLitros * precoDiesel;
+  const totalLitros = useMemo(() => dadosFiltrados.reduce((acc, d) => acc + (d.litros || 0), 0), [dadosFiltrados]);
+  const valorTotal  = totalLitros * (precoDiesel || 0);
   const mediaLitros = dadosFiltrados.length > 0 ? totalLitros / dadosFiltrados.length : 0;
-  const maiorAbastecimento = dadosFiltrados.length > 0 ? Math.max(...dadosFiltrados.map(d => d.litros)) : 0;
+  const maiorAbastecimento = dadosFiltrados.length > 0 ? Math.max(...dadosFiltrados.map(d => d.litros || 0)) : 0;
 
   const dadosPorData = useMemo(() => {
     const ag: Record<string, number> = {};
-    dadosFiltrados.forEach(d => { ag[d.data] = (ag[d.data] || 0) + d.litros; });
+    dadosFiltrados.forEach(d => { if(d.data) ag[d.data] = (ag[d.data] || 0) + (d.litros || 0); });
     return Object.entries(ag).sort(([a],[b]) => a.localeCompare(b)).map(([data, litros]) => ({
       data: new Date(data).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }),
       litros,
-      valor: litros * precoDiesel,
+      valor: litros * (precoDiesel || 0),
     }));
   }, [dadosFiltrados, precoDiesel]);
 
   const dadosPorDiretoria = useMemo(() => {
     const ag: Record<string, number> = {};
-    dadosFiltrados.forEach(d => { ag[d.diretoria] = (ag[d.diretoria] || 0) + d.litros * precoDiesel; });
+    dadosFiltrados.forEach(d => { ag[d.diretoria || 'Sem Diretoria'] = (ag[d.diretoria || 'Sem Diretoria'] || 0) + (d.litros || 0) * (precoDiesel || 0); });
     return Object.entries(ag).map(([diretoria, realizado]) => {
       const orc = orcamento.find(o => o.diretoria === diretoria);
       return { diretoria, orcamento: orc?.orcamento || 0, realizado };
@@ -451,17 +458,18 @@ export default function Dashboard({
 
   const dadosPorSemana = useMemo(() => {
     const ag: Record<number, number> = {};
-    dadosFiltrados.forEach(d => { ag[d.semana] = (ag[d.semana] || 0) + d.litros; });
+    dadosFiltrados.forEach(d => { ag[d.semana || 1] = (ag[d.semana || 1] || 0) + (d.litros || 0); });
     return [1,2,3,4,5].map(s => ({ semana: `Sem ${s}`, litros: ag[s] || 0 }));
   }, [dadosFiltrados]);
 
   const dadosPorEquipamento = useMemo(() => {
     const ag: Record<string, { litros: number; gerencia: string; diretoria: string }> = {};
     dadosFiltrados.forEach(d => {
-      if (!ag[d.equipamento]) {
-        ag[d.equipamento] = { litros: 0, gerencia: d.gerencia, diretoria: d.diretoria };
+      const nome = d.equipamento || 'Sem Equipamento';
+      if (!ag[nome]) {
+        ag[nome] = { litros: 0, gerencia: d.gerencia || '', diretoria: d.diretoria || '' };
       }
-      ag[d.equipamento].litros += d.litros;
+      ag[nome].litros += (d.litros || 0);
     });
     return Object.entries(ag).sort(([,a],[,b]) => b.litros - a.litros).slice(0, 10)
       .map(([equipamento, info]) => ({
@@ -476,21 +484,21 @@ export default function Dashboard({
 
   const dadosPorAreaLot = useMemo(() => {
     const ag: Record<string, number> = {};
-    dadosFiltrados.forEach(d => { ag[d.areaLot] = (ag[d.areaLot] || 0) + d.litros; });
+    dadosFiltrados.forEach(d => { ag[d.areaLot || 'Sem Área'] = (ag[d.areaLot || 'Sem Área'] || 0) + (d.litros || 0); });
     return Object.entries(ag).map(([name, value]) => ({ name, value }));
   }, [dadosFiltrados]);
 
   const dadosPorGerencia = useMemo(() => {
     const ag: Record<string, number> = {};
     dadosFiltrados.forEach(d => {
-      ag[d.gerencia] = (ag[d.gerencia] || 0) + d.litros * precoDiesel;
+      ag[d.gerencia || 'Sem Gerência'] = (ag[d.gerencia || 'Sem Gerência'] || 0) + (d.litros || 0) * (precoDiesel || 0);
     });
     return Object.entries(ag)
       .sort(([,a],[,b]) => b - a)
       .map(([name, value]) => ({ name: name || 'Sem Gerência', value }));
   }, [dadosFiltrados, precoDiesel]);
 
-  const totalSelecionados = Object.values(selecoes).reduce((a, v) => a + v.length, 0);
+  const totalSelecionados = Object.values(selecoes).reduce((a, v) => a + (v?.length || 0), 0);
   const hasFiltros = totalSelecionados > 0;
 
   const limparTudo = useCallback(() => {
@@ -562,8 +570,8 @@ export default function Dashboard({
                 <motion.div key={key} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.15 }}>
                   <MultiSelect
                     label={cfg.label}
-                    opcoes={key === 'semana' ? ['1','2','3','4','5'] : opcoes[key]}
-                    selecionados={selecoes[key]}
+                    opcoes={opcoes[key] || []}
+                    selecionados={selecoes[key] || []}
                     onChange={vals => setSel(key, vals)}
                     onRemove={() => toggleFiltro(key)}
                     mono={cfg.mono}
@@ -587,14 +595,14 @@ export default function Dashboard({
         {hasFiltros && (
           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-100">
             {(Object.entries(selecoes) as [FiltroKey, string[]][]).flatMap(([key, vals]) =>
-              vals.map(val => {
+              (vals || []).map(val => {
                 const cfg = TODOS_FILTROS.find(f => f.key === key)!;
                 return (
                   <motion.span key={`${key}-${val}`} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs rounded-full">
                     <span className="text-blue-400 font-medium">{cfg.label}:</span>
                     <span className={`font-semibold ${cfg.mono ? 'font-mono' : ''}`}>{val}</span>
-                    <button onClick={() => setSel(key, selecoes[key].filter(v => v !== val))} className="text-blue-400 hover:text-blue-700 transition-colors ml-0.5">
+                    <button onClick={() => setSel(key, (selecoes[key] || []).filter(v => v !== val))} className="text-blue-400 hover:text-blue-700 transition-colors ml-0.5">
                       <X className="w-3 h-3" />
                     </button>
                   </motion.span>
