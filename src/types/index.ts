@@ -44,7 +44,7 @@ export interface ParametrosSistema {
   precoDiesel: number;
 }
 
-// Definição da interface Equipamento que estava faltando
+// ESTA É A INTERFACE QUE O APP ESTÁ PROCURANDO E NÃO ACHANDO
 export interface Equipamento {
   id: string;
   equipamento: string;
