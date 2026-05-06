@@ -725,6 +725,78 @@ export default function Dashboard({
       {/* ── Gráficos ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+        {/* ── Novo Gráfico: Valor Total por Gerência ── */}
+<motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.4}}
+  className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+  <div className="flex items-center gap-2 mb-4">
+    <Building2 className="w-5 h-5 text-blue-700"/>
+    <h3 className="font-semibold text-slate-800">Valor Total por Gerência</h3>
+  </div>
+  
+  {(() => {
+    const dadosPorGerencia = useMemo(() => {
+      const ag: Record<string, number> = {};
+      dadosFiltrados.forEach(d => { 
+        ag[d.gerencia] = (ag[d.gerencia] || 0) + d.litros * precoDiesel; 
+      });
+      return Object.entries(ag)
+        .sort(([,a],[,b]) => b - a)
+        .map(([name, value]) => ({ name: name || 'Sem Gerência', value }));
+    }, [dadosFiltrados, precoDiesel]);
+
+    if (dadosPorGerencia.length === 0) {
+      return <div className="h-64 flex items-center justify-center text-slate-400">Nenhum dado disponível</div>;
+    }
+
+    return (
+      <div className="flex flex-col lg:flex-row gap-6 items-center">
+        <div className="flex-shrink-0 w-full lg:w-64">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={dadosPorGerencia}
+                cx="50%" cy="50%"
+                innerRadius={60} outerRadius={100}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {dadosPorGerencia.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'13px', padding:'8px 12px' }}
+                formatter={(v, name) => [formatCurrency(Number(v)), String(name)]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex-1 min-w-0 w-full">
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {dadosPorGerencia.map((item, idx) => {
+              const totalGeral = dadosPorGerencia.reduce((a, b) => a + b.value, 0);
+              const perc = totalGeral > 0 ? (item.value / totalGeral) * 100 : 0;
+              return (
+                <div key={item.name} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: COLORS[idx % COLORS.length] }} />
+                  <span className="text-sm text-slate-700 flex-1 truncate font-medium">{item.name}</span>
+                  <span className="text-sm font-bold text-slate-800 whitespace-nowrap">
+                    {formatCurrency(item.value)}
+                  </span>
+                  <span className="text-xs text-slate-500 w-12 text-right">
+                    {perc.toFixed(0)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
+</motion.div>
+
         {/* Consumo ao longo do tempo */}
         <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.2}}
           className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
