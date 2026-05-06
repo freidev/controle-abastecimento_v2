@@ -46,13 +46,13 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function App() {
-  // CORREÇÃO: Adicionado 'logout' aqui para ser usado no botão Sair
+  // Garante acesso à função logout e validação de rotas
   const { user, podeAcessar, logout } = useAuth();
 
   // Se não estiver logado, mostra a tela de Login
   if (!user) return <Login />;
 
-  // Define a aba inicial baseada no perfil (Operador vai direto para Preenchimento)
+  // Define a aba inicial baseada no perfil
   const getInitialTab = () => {
     if (user.role === 'operador') return 'preenchimento';
     return 'dashboard';
@@ -108,9 +108,9 @@ export default function App() {
     dados.length > 0 ? Math.max(...dados.map(d => d.id)) + 1 : 1
   , [dados]);
 
-  // Garante que o nome do usuário logado é salvo corretamente
+  // Salva o nome do usuário logado ao criar
   const handleAdd = useCallback(async (item: Omit<Abastecimento, 'id' | 'valor'>) => {
- Abastecimento = {
+    const novo: Abastecimento = {
       ...item,
       id: nextId,
       valor: item.litros * parametros.precoDiesel,
@@ -298,7 +298,7 @@ export default function App() {
                   {user?.role === 'admin' ? 'Admin' : 'Op'}
                 </span>
               </div>
-              {/* CORREÇÃO: Botão Sair usando a função logout real */}
+              {/* Botão Sair funcional */}
               <button onClick={logout} title="Sair"
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap border border-white/10 flex-shrink-0">
                 <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
@@ -335,7 +335,6 @@ export default function App() {
                   );
                 })}
                 <div className="pt-2 mt-2 border-t border-white/10">
-                   {/* CORREÇÃO: Botão Sair no menu mobile também */}
                    <button onClick={logout} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-white/10">
                      <LogOut className="w-4 h-4" /> Sair da conta
                    </button>
