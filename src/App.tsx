@@ -48,16 +48,12 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 export default function App() {
   const { user, podeAcessar, logout } = useAuth();
 
-  // Se não estiver logado, mostra a tela de Login
-  if (!user) return <Login />;
-
-  // Define a aba inicial baseada no perfil
   const getInitialTab = () => {
-    if (user.role === 'operador') return 'preenchimento';
+    if (user?.role === 'operador') return 'preenchimento';
     return 'dashboard';
   };
 
-  const [activeTab, setActiveTab]   = useState<TabType>(getInitialTab());
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab());
   const [dados, setDados]           = useState<Abastecimento[]>([]);
   const [orcamento, setOrcamento]   = useState<OrcamentoDiretoria[]>([]);
   const [rateios, setRateios]       = useState<RateioCC[]>([]);
@@ -256,7 +252,7 @@ export default function App() {
     }
   };
 
-  if (carregando) {
+  if (!user) return <Login />;
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#1C2340' }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
