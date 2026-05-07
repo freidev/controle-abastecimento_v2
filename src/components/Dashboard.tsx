@@ -1,4 +1,4 @@
-import { Fuel, DollarSign, TrendingUp, TrendingDown, Droplets, Calendar, Filter, X, ChevronDown, ChevronUp, Search, Check, Plus, Settings2, GripVertical, Eye, EyeOff, Building2 } from 'lucide-react';
+
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
