@@ -874,7 +874,7 @@ export default function Dashboard({
           <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
             Nenhum dado disponível
           </div>
-        ) : ( }
+        ) : ( 
           <>
           {/* ── Mobile: lista de cards ── */}
           <div className="block lg:hidden space-y-2 mb-2">
