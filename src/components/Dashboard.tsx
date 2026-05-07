@@ -722,48 +722,19 @@ export default function Dashboard({
         ))}
       </div>
 
-            {/* ── Gráficos ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+           {/* ── Gráficos ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Gráfico de Colunas: Valor Total por Gerência */}
-        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.2}}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 className="w-4 h-4 text-blue-700"/>
-            <h3 className="font-semibold text-slate-800 text-sm">Valor Total por Gerência</h3>
-          </div>
-          {dadosPorGerencia.length === 0 ? (
-            <div className="h-56 flex items-center justify-center text-slate-400 text-sm">Nenhum dado disponível</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={dadosPorGerencia} margin={{ top: 5, right: 5, left: -20, bottom: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
-                <XAxis 
-                  dataKey="name" 
-                  tick={{fontSize: 10, angle: -30, textAnchor: 'end'}} 
-                  interval={0}
-                />
-                <YAxis tick={{fontSize: 10}} width={50} tickFormatter={(v) => formatCurrency(v)}/>
-                <Tooltip 
-                  contentStyle={{ borderRadius:'8px', border:'1px solid #e2e8f0', fontSize:'12px' }}
-                  formatter={(v) => [formatCurrency(Number(v))]}
-                  labelFormatter={(label) => `${label}`}
-                />
-                <Bar dataKey="value" fill="#1e40af" name="Valor" radius={[4, 4, 0, 0]} />
-                <Legend wrapperStyle={{fontSize:'11px'}}/>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </motion.div>
+      
 
         {/* Consumo ao longo do tempo */}
         <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.2}}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-blue-700" />
-            <h3 className="font-semibold text-slate-800 text-sm">Consumo ao Longo do Tempo</h3>
+          className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5 text-blue-700" />
+            <h3 className="font-semibold text-slate-800">Consumo ao Longo do Tempo</h3>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={dadosPorData}>
               <defs>
                 <linearGradient id="gradLitros" x1="0" y1="0" x2="0" y2="1">
@@ -771,10 +742,10 @@ export default function Dashboard({
                   <stop offset="95%" stopColor="#1e40af" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
-              <XAxis dataKey="data" tick={{fontSize:10}} stroke="#94a3b8"/>
-              <YAxis tick={{fontSize:10}} stroke="#94a3b8"/>
-              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'12px'}}
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
+              <XAxis dataKey="data" tick={{fontSize:12}} stroke="#94a3b8"/>
+              <YAxis tick={{fontSize:12}} stroke="#94a3b8"/>
+              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'13px'}}
                 formatter={v => [`${v} L`,'Litros']}/>
               <Area type="monotone" dataKey="litros" stroke="#1e40af" strokeWidth={2} fill="url(#gradLitros)"/>
             </AreaChart>
@@ -782,20 +753,20 @@ export default function Dashboard({
         </motion.div>
 
         {/* Orçado vs Realizado */}
-        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.3}}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingDown className="w-4 h-4 text-orange-600"/>
-            <h3 className="font-semibold text-slate-800 text-sm">Orçado vs Realizado por Diretoria</h3>
+        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.25}}
+          className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingDown className="w-5 h-5 text-orange-600"/>
+            <h3 className="font-semibold text-slate-800">Orçado vs Realizado por Diretoria</h3>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={300}>
             <BarChart data={dadosPorDiretoria}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
-              <XAxis dataKey="diretoria" tick={{fontSize:9}} stroke="#94a3b8"/>
-              <YAxis tick={{fontSize:10}} stroke="#94a3b8"/>
-              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'12px'}}
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
+              <XAxis dataKey="diretoria" tick={{fontSize:11}} stroke="#94a3b8"/>
+              <YAxis tick={{fontSize:12}} stroke="#94a3b8"/>
+              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'13px'}}
                 formatter={v => [formatCurrency(Number(v)),'']}/>
-              <Legend wrapperStyle={{fontSize:'11px'}}/>
+              <Legend wrapperStyle={{fontSize:'13px'}}/>
               <Bar dataKey="orcamento" fill="#94a3b8" name="Orçado" radius={[4,4,0,0]}/>
               <Bar dataKey="realizado" fill="#1e40af" name="Realizado" radius={[4,4,0,0]}/>
             </BarChart>
@@ -804,17 +775,17 @@ export default function Dashboard({
 
         {/* Consumo por Semana */}
         <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.3}}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-blue-700"/>
-            <h3 className="font-semibold text-slate-800 text-sm">Consumo por Semana</h3>
+          className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5 text-blue-700"/>
+            <h3 className="font-semibold text-slate-800">Consumo por Semana</h3>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={300}>
             <BarChart data={dadosPorSemana}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
-              <XAxis dataKey="semana" tick={{fontSize:10}} stroke="#94a3b8"/>
-              <YAxis tick={{fontSize:10}} stroke="#94a3b8"/>
-              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'12px'}}
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
+              <XAxis dataKey="semana" tick={{fontSize:12}} stroke="#94a3b8"/>
+              <YAxis tick={{fontSize:12}} stroke="#94a3b8"/>
+              <Tooltip contentStyle={{borderRadius:'8px',border:'1px solid #e2e8f0',fontSize:'13px'}}
                 formatter={v => [`${v} L`,'Litros']}/>
               <Bar dataKey="litros" fill="#1e40af" radius={[6,6,0,0]}/>
             </BarChart>
@@ -822,20 +793,22 @@ export default function Dashboard({
         </motion.div>
 
         {/* Pizza por Área Lotação */}
-        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.4}}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Droplets className="w-4 h-4 text-blue-700"/>
-            <h3 className="font-semibold text-slate-800 text-sm">Distribuição por Área de Lotação</h3>
+        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.35}}
+          className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Droplets className="w-5 h-5 text-blue-700"/>
+            <h3 className="font-semibold text-slate-800">Distribuição por Área de Lotação</h3>
           </div>
-          <div className="flex flex-col lg:flex-row gap-4 items-center">
-            <div className="flex-shrink-0 w-full lg:w-56">
-              <ResponsiveContainer width="100%" height={200}>
+
+          <div className="flex flex-col lg:flex-row gap-6 items-center">
+            {/* ── Gráfico de pizza ── */}
+            <div className="flex-shrink-0 w-full lg:w-64">
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={dadosPorAreaLot}
                     cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={80}
+                    innerRadius={60} outerRadius={100}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -844,31 +817,46 @@ export default function Dashboard({
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'12px', padding:'8px 12px' }}
+                    contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'13px', padding:'8px 12px' }}
                     formatter={(v, name) => [`${Number(v).toLocaleString('pt-BR')} L`, String(name)]}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex-1 min-w-0 w-full">
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {dadosPorAreaLot.sort((a,b) => b.value - a.value).map((item, idx) => {
-                  const totalGeral = dadosPorAreaLot.reduce((a, b) => a + b.value, 0);
-                  const perc = totalGeral > 0 ? (item.value / totalGeral) * 100 : 0;
+
+            {/* ── Legenda ── */}
+            <div className="flex-1 min-w-0">
+              {(() => {
+                const totalGeral = dadosPorAreaLot.reduce((a, d) => a + d.value, 0);
+                  const ordenado   = [...dadosPorAreaLot].sort((a, b) => b.value - a.value);
                   return (
-                    <div key={item.name} className="flex items-center gap-2.5 py-1 px-2 rounded-lg hover:bg-slate-50 transition-colors">
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: COLORS[idx % COLORS.length] }} />
-                      <span className="text-xs text-slate-700 flex-1 truncate font-medium">{item.name}</span>
-                      <span className="text-xs font-bold text-slate-800 whitespace-nowrap">
-                        {item.value.toLocaleString('pt-BR')} L
-                      </span>
-                      <span className="text-xs text-slate-500 w-10 text-right">
-                        {perc.toFixed(0)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {ordenado.map((item) => {
+                        const idx  = dadosPorAreaLot.findIndex(d => d.name === item.name);
+                      const cor  = COLORS[idx % COLORS.length];
+                      const perc = totalGeral > 0 ? (item.value / totalGeral) * 100 : 0;
+                      return (
+                        <div key={item.name} className="flex items-center gap-2.5 py-1 px-2 rounded-lg hover:bg-slate-50 transition-colors">
+                          {/* Cor */}
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: cor }} />
+                          {/* Nome */}
+                          <span className="text-xs text-slate-700 flex-1 truncate font-medium" title={item.name}>
+                            {item.name}
+                          </span>
+                          {/* Litros */}
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {item.value.toLocaleString('pt-BR')} L
+                          </span>
+                          {/* % */}
+                          <span className="text-xs font-bold w-10 text-right" style={{ color: cor }}>
+                            {perc.toFixed(0)}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </motion.div>
@@ -876,32 +864,18 @@ export default function Dashboard({
 
       {/* Top Equipamentos */}
       <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.4}}
-        className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Fuel className="w-4 h-4 text-blue-700"/>
-          <h3 className="font-semibold text-slate-800 text-sm">Top Equipamentos — Consumo (Litros)</h3>
+        className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Fuel className="w-5 h-5 text-blue-700"/>
+          <h3 className="font-semibold text-slate-800">Top Equipamentos — Consumo (Litros)</h3>
         </div>
+
         {dadosPorEquipamento.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Nenhum dado disponível</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(250, dadosPorEquipamento.length * 45)}>
-            <BarChart data={dadosPorEquipamento} layout="vertical" margin={{ left: 0, right: 20, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false}/>
-              <XAxis type="number" tick={{fontSize:10}} stroke="#94a3b8"/>
-              <YAxis dataKey="equipamento" type="category" tick={{fontSize:9, width: 100}} stroke="#94a3b8"/>
-              <Tooltip
-                contentStyle={{ borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'12px', padding:'8px 12px' }}
-                formatter={v => [`${v} L`,'Litros']}
-              />
-              <Bar dataKey="litros" fill="#f97316" radius={[0,6,6,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-   
+          <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+            Nenhum dado disponível
+          </div>
+        ) : ( }
+          <>
           {/* ── Mobile: lista de cards ── */}
           <div className="block lg:hidden space-y-2 mb-2">
             {dadosPorEquipamento.map((item, idx) => {
