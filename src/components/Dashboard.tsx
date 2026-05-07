@@ -725,6 +725,36 @@ export default function Dashboard({
       {/* ── Gráficos ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+        {/* Gráfico de Colunas: Valor Total por Gerência */}
+        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.2}}
+          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Building2 className="w-4 h-4 text-blue-700"/>
+            <h3 className="font-semibold text-slate-800 text-sm">Valor Total por Gerência</h3>
+          </div>
+          {dadosPorGerencia.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-slate-400 text-sm">Nenhum dado disponível</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={dadosPorGerencia} margin={{ top: 5, right: 5, left: -20, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
+                <XAxis 
+                  dataKey="name" 
+                  tick={{fontSize: 9, angle: -45, textAnchor: 'end', height: 50}} 
+                  interval={0}
+                />
+                <YAxis tick={{fontSize: 10}} width={50}/>
+                <Tooltip 
+                  contentStyle={{ borderRadius:'8px', border:'1px solid #e2e8f0', fontSize:'12px' }}
+                  formatter={(v) => [formatCurrency(Number(v))]}
+                />
+                <Bar dataKey="value" fill="#1e40af" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </motion.div>
+        {/* final do codigo*/}
+
         {/* Consumo ao longo do tempo */}
         <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} transition={{delay:0.2}}
           className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
