@@ -901,7 +901,7 @@ export default function Dashboard({
     </div>
   );
 }
-          <>
+   
           {/* ── Mobile: lista de cards ── */}
           <div className="block lg:hidden space-y-2 mb-2">
             {dadosPorEquipamento.map((item, idx) => {
