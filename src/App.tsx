@@ -48,9 +48,11 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 export default function App() {
   const { user, podeAcessar, logout } = useAuth();
 
+  if (!user) return <Login />;
+
   const getInitialTab = () => {
     if (user?.role === 'operador') return 'preenchimento';
-    return 'dashboard';
+    return 'dashboard'; 
   };
 
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab());
