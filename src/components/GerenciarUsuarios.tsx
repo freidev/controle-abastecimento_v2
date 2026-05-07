@@ -2,37 +2,55 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, CheckCircle, X, Clock, Shield, User,
-  Trash2, Bell, Key, Eye, EyeOff, AlertCircle, UserCheck
+  Trash2, Bell, Key, Eye, EyeOff, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function GerenciarUsuarios() {
-  const { usuarios, solicitacoes, aprovarSolicitacao, rejeitarSolicitacao, excluirUsuario, alterarSenha, user } = useAuth();
+  const {
+    usuarios,
+    solicitacoes,
+    aprovarSolicitacao,
+    rejeitarSolicitacao,
+    excluirUsuario,
+    alterarSenha,
+    user,
+    isAdminPrincipal
+  } = useAuth();
+
   const [aba, setAba] = useState<'solicitacoes' | 'usuarios'>('solicitacoes');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editandoSenha, setEditandoSenha] = useState<string | null>(null);
   const [novaSenha, setNovaSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [sucessoMsg, setSucessoMsg] = useState('');
+  const [erroMsg, setErroMsg] = useState('');
 
-  // Filtra solicitações baseado no perfil do usuário
-  const pendentes = solicitacoes.filter(s => {
-    if (user?.role === 'admin') return s.status === 'pendente'; // Admin vê tudo
-    return s.role === 'operador' && s.status === 'pendente'; // Operador só vê operadores
-  });
-
+  const pendentes = solicitacoes.filter(s => s.status === 'pendente');
   const avaliadas = solicitacoes.filter(s => s.status !== 'pendente');
 
   const handleAprovar = async (id: string) => {
-    await aprovarSolicitacao(id);
-    setSucessoMsg('Usuário aprovado com sucesso!');
-    setTimeout(() => setSucessoMsg(''), 3000);
+    setErroMsg('');
+    const res = await aprovarSolicitacao(id);
+    if (res.ok) {
+      setSucessoMsg('Usuário aprovado com sucesso!');
+      setTimeout(() => setSucessoMsg(''), 3000);
+    } else {
+      setErroMsg(res.motivo || 'Erro ao aprovar.');
+      setTimeout(() => setErroMsg(''), 4000);
+    }
   };
 
   const handleRejeitar = async (id: string) => {
-    await rejeitarSolicitacao(id);
-    setSucessoMsg('Solicitação rejeitada.');
-    setTimeout(() => setSucessoMsg(''), 3000);
+    setErroMsg('');
+    const res = await rejeitarSolicitacao(id);
+    if (res.ok) {
+      setSucessoMsg('Solicitação rejeitada.');
+      setTimeout(() => setSucessoMsg(''), 3000);
+    } else {
+      setErroMsg(res.motivo || 'Erro ao rejeitar.');
+      setTimeout(() => setErroMsg(''), 4000);
+    }
   };
 
   const handleAlterarSenha = async (id: string) => {
@@ -55,7 +73,13 @@ export default function GerenciarUsuarios() {
         </motion.div>
       )}
 
-      {/* Header */}
+      {erroMsg && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" /> {erroMsg}
+        </motion.div>
+      )}
+
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
         <div className="flex items-center gap-3">
@@ -75,7 +99,18 @@ export default function GerenciarUsuarios() {
         </div>
       </motion.div>
 
-      {/* Abas */}
+      {isAdminPrincipal && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+          🛡️ Você está logado como <strong>Administrador Principal</strong>. Só você pode aprovar novos administradores.
+        </div>
+      )}
+
+      {!isAdminPrincipal && user?.role === 'admin' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+          ⚠️ Você é um administrador comum. Pode aprovar operadores, mas não pode aprovar novos administradores.
+        </div>
+      )}
+
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
         <button onClick={() => setAba('solicitacoes')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -100,97 +135,60 @@ export default function GerenciarUsuarios() {
             {pendentes.length > 0 ? (
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide px-1">⏳ Aguardando aprovação</p>
-                {pendentes.map(s => (
-                  <motion.div key={s.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    className={`bg-white border-2 rounded-xl p-4 ${s.role === 'admin' ? 'border-purple-300' : 'border-amber-200'}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.role === 'admin' ? 'bg-purple-100' : 'bg-amber-100'}`}>
-                          {s.role === 'admin' ? <Shield className="w-5 h-5 text-purple-600" /> : <User className="w-5 h-5 text-amber-600" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
+                {pendentes.map(s => {
+                  const adminPendente = s.role === 'admin';
+                  const podeAprovarAdmin = isAdminPrincipal;
+                  const podeAprovar = s.role === 'operador' || (adminPendente && podeAprovarAdmin);
+
+                  return (
+                    <motion.div key={s.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      className={`bg-white rounded-xl p-4 border-2 ${adminPendente ? 'border-rose-200' : 'border-amber-200'}`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${adminPendente ? 'bg-rose-100' : 'bg-amber-100'}`}>
+                            {adminPendente ? <Shield className="w-5 h-5 text-rose-600" /> : <User className="w-5 h-5 text-amber-600" />}
+                          </div>
+                          <div>
                             <p className="font-semibold text-slate-800">{s.nome}</p>
-                            {s.role === 'admin' && (
-                              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                                👑 Admin
+                            <p className="text-sm text-slate-500 font-mono">@{s.login}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${adminPendente ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {adminPendente ? '🛡️ Solicitação de Admin' : '👤 Solicitação de Operador'}
                               </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-500 font-mono">@{s.login}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`px-2 py-0.5 rounded-full text-xs ${s.role === 'admin' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
-                              {s.role === 'admin' ? 'Administrador' : 'Operador'}
-                            </span>
-                            {s.role === 'admin' && user?.login !== 'admin' && (
-                              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Requer aprovação do Admin Principal
-                              </span>
+                              <span className="text-xs text-slate-400">{fmt(s.criadoEm)}</span>
+                            </div>
+                            {adminPendente && !podeAprovarAdmin && (
+                              <p className="text-xs text-red-500 mt-2 font-medium">
+                                Apenas o Administrador Principal pode aprovar este cadastro.
+                              </p>
                             )}
                           </div>
                         </div>
+
+                        <div className="flex gap-2 sm:flex-col lg:flex-row">
+                          <button onClick={() => handleAprovar(s.id)} disabled={!podeAprovar}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors ${
+                              podeAprovar ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-300 cursor-not-allowed'
+                            }`}>
+                            <CheckCircle className="w-4 h-4" /> Aprovar
+                          </button>
+                          <button onClick={() => handleRejeitar(s.id)} disabled={!podeAprovar}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 border text-sm font-medium rounded-xl transition-colors ${
+                              podeAprovar ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                            }`}>
+                            <X className="w-4 h-4" /> Rejeitar
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-2 sm:flex-col lg:flex-row">
-                        {s.role === 'admin' && user?.login !== 'admin' ? (
-                          <div className="text-xs text-slate-500 italic px-3 py-2">
-                            Aguardando aprovação do administrador principal
-                          </div>
-                        ) : (
-                          <>
-                            <button onClick={() => handleAprovar(s.id)}
-                              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors">
-                              <CheckCircle className="w-4 h-4" /> Aprovar
-                            </button>
-                            <button onClick={() => handleRejeitar(s.id)}
-                              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-medium rounded-xl transition-colors">
-                              <X className="w-4 h-4" /> Rejeitar
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
                 <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
                 <p className="text-slate-600 font-medium">Nenhuma solicitação pendente</p>
                 <p className="text-slate-400 text-sm mt-1">Todas as solicitações foram avaliadas</p>
-              </div>
-            )}
-
-            {/* Histórico */}
-            {avaliadas.length > 0 && (
-              <div className="mt-6">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1 mb-3">Histórico</p>
-                <div className="space-y-2">
-                  {avaliadas.map(s => (
-                    <div key={s.id} className={`bg-white rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${s.status === 'aprovado' ? 'border-emerald-200' : 'border-red-200'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.status === 'aprovado' ? 'bg-emerald-100' : 'bg-red-100'}`}>
-                          {s.status === 'aprovado' ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-red-600" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">
-                            {s.nome} <span className="font-mono text-slate-400">@{s.login}</span>
-                            {s.role === 'admin' && (
-                              <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-                                👑 Admin
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {s.status === 'aprovado' ? '✅ Aprovado' : '❌ Rejeitado'} em {s.criadoEm ? fmt(s.criadoEm) : '—'}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full self-start sm:self-auto">
-                        {s.role === 'admin' ? 'Admin' : 'Operador'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </motion.div>
@@ -204,20 +202,13 @@ export default function GerenciarUsuarios() {
                 <div key={u.id} className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${u.role === 'admin' ? 'bg-purple-100' : 'bg-emerald-100'}`}>
-                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-purple-600" /> : <User className="w-5 h-5 text-emerald-600" />}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${u.role === 'admin' ? 'bg-blue-100' : 'bg-emerald-100'}`}>
+                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-blue-600" /> : <User className="w-5 h-5 text-emerald-600" />}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-800 text-sm">{u.nome}</p>
-                          {u.role === 'admin' && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-                              👑 Admin
-                            </span>
-                          )}
-                        </div>
+                        <p className="font-semibold text-slate-800 text-sm">{u.nome}</p>
                         <p className="text-xs text-slate-500 font-mono">@{u.login}</p>
-                        <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {u.role === 'admin' ? '🛡️ Admin' : '👤 Operador'}
                         </span>
                       </div>
@@ -232,7 +223,12 @@ export default function GerenciarUsuarios() {
 
                         {confirmDelete === u.id ? (
                           <div className="flex gap-1">
-                            <button onClick={async () => { await excluirUsuario(u.id); setConfirmDelete(null); setSucessoMsg('Usuário excluído.'); setTimeout(()=>setSucessoMsg(''), 3000); }}
+                            <button onClick={async () => {
+                              await excluirUsuario(u.id);
+                              setConfirmDelete(null);
+                              setSucessoMsg('Usuário excluído.');
+                              setTimeout(() => setSucessoMsg(''), 3000);
+                            }}
                               className="px-2.5 py-1.5 bg-red-600 text-white text-xs rounded-lg font-medium hover:bg-red-700">
                               Confirmar
                             </button>
@@ -249,9 +245,7 @@ export default function GerenciarUsuarios() {
                         )}
                       </div>
                     )}
-                    {u.id === user?.id && (
-                      <span className="text-xs text-slate-400 italic">Você</span>
-                    )}
+                    {u.id === user?.id && <span className="text-xs text-slate-400 italic">Você</span>}
                   </div>
 
                   <AnimatePresence>
