@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 export type UserRole = 'admin' | 'operador';
+export type SolicitacaoStatus = 'pendente' | 'aprovado' | 'rejeitado';
 
 export interface User {
   id: string;
@@ -19,30 +20,82 @@ export interface Solicitacao {
   login: string;
   senha: string;
   role: UserRole;
-  status: 'pendente' | 'aprovado' | 'rejeitado';
+  status: SolicitacaoStatus;
   criadoEm: string;
+  avaliadoEm?: string;
 }
 
-// ── Abas permitidas por perfil ────────────────────────────────────────────────
+const USUARIOS_PADRAO: User[] = [
+  {
+    id: 'admin-1',
+    nome: 'Administrador',
+    login: 'admin',
+    senha: 'admin123',
+    role: 'admin',
+    ativo: true,
+    criadoEm: new Date().toISOString(),
+  },
+];
+
 export const ABAS_PERMITIDAS: Record<UserRole, string[]> = {
-  admin: ['dashboard', 'base_dados', 'orcamento', 'rateio', 'cadastro_equipamento', 'preenchimento', 'importacao', 'exportacao', 'parametros', 'usuarios', 'historico'],
-  operador: ['preenchimento', 'historico'],
+  admin: [
+    'dashboard',
+    'base_dados',
+    'orcamento',
+    'rateio',
+    'cadastro_equipamento',
+    'preenchimento',
+    'importacao',
+    'exportacao',
+    'parametros',
+    'usuarios',
+    'historico',
+  ],
+  operador: ['preenchimento'],
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function mapDbUserToUser(dbUser: any): User {
-  return {
-    id: dbUser.id,
-    nome: dbUser.nome,
-    login: dbUser.login,
-    senha: dbUser.senha,
-    role: dbUser.role as UserRole,
-    ativo: dbUser.status === 'ativo' || dbUser.status === 'aprovado',
-    criadoEm: dbUser.criado_em,
-  };
+const KEYS = {
+  usuarios: 'auth_usuarios',
+  solicitacoes: 'auth_solicitacoes',
+  sessao: 'auth_user',
+};
+
+function loadUsuarios(): User[] {
+  try {
+    const salvo = localStorage.getItem(KEYS.usuarios);
+    const usuarios = salvo ? JSON.parse(salvo) as User[] : [];
+
+    const temAdminPrincipal = usuarios.some(u => u.login === 'admin');
+
+    if (!temAdminPrincipal) {
+      const lista = [...USUARIOS_PADRAO, ...usuarios];
+      localStorage.setItem(KEYS.usuarios, JSON.stringify(lista));
+      return lista;
+    }
+
+    return usuarios.length > 0 ? usuarios : USUARIOS_PADRAO;
+  } catch {
+    return USUARIOS_PADRAO;
+  }
 }
 
-// ── Context ───────────────────────────────────────────────────────────────────
+function saveUsuarios(usuarios: User[]) {
+  localStorage.setItem(KEYS.usuarios, JSON.stringify(usuarios));
+}
+
+function loadSolicitacoes(): Solicitacao[] {
+  try {
+    const salvo = localStorage.getItem(KEYS.solicitacoes);
+    return salvo ? JSON.parse(salvo) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSolicitacoes(solicitacoes: Solicitacao[]) {
+  localStorage.setItem(KEYS.solicitacoes, JSON.stringify(solicitacoes));
+}
+
 interface AuthContextType {
   user: User | null;
   usuarios: User[];
@@ -56,170 +109,145 @@ interface AuthContextType {
   excluirUsuario: (id: string) => Promise<void>;
   alterarSenha: (id: string, novaSenha: string) => Promise<void>;
   podeAcessar: (aba: string) => boolean;
+  isAdminPrincipal: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [usuarios, setUsuarios] = useState<User[]>(loadUsuarios);
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>(loadSolicitacoes);
+  const [loading] = useState(false);
+
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const s = sessionStorage.getItem('auth_user');
-      return s ? JSON.parse(s) : null;
-    } catch { return null; }
+      const salvo = sessionStorage.getItem(KEYS.sessao);
+      return salvo ? JSON.parse(salvo) : null;
+    } catch {
+      return null;
+    }
   });
 
-  const [usuarios, setUsuarios] = useState<User[]>([]);
-  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
-  const [loading, setLoading] = useState(true);
+  const login = useCallback((loginStr: string, senha: string) => {
+    const usuario = usuarios.find(
+      u =>
+        u.login.toLowerCase() === loginStr.toLowerCase() &&
+        u.senha === senha &&
+        u.ativo
+    );
 
-  const fetchAllUsers = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select('*')
-      .order('criado_em', { ascending: false });
-
-    if (data && !error) {
-      const users = data.filter(u => u.status === 'ativo' || u.status === 'aprovado').map(mapDbUserToUser);
-      const requests = data
-        .filter(u => u.status === 'pendente')
-        .map(u => ({
-          id: u.id,
-          nome: u.nome,
-          login: u.login,
-          senha: u.senha,
-          role: u.role as UserRole,
-          status: 'pendente' as const,
-          criadoEm: u.criado_em,
-        }));
-
-      setUsuarios(users);
-      setSolicitacoes(requests);
+    if (!usuario) {
+      return { ok: false, motivo: 'Usuário ou senha incorretos.' };
     }
-    setLoading(false);
-  }, []);
 
-  useEffect(() => {
-    fetchAllUsers();
-  }, [fetchAllUsers]);
+    setUser(usuario);
+    sessionStorage.setItem(KEYS.sessao, JSON.stringify(usuario));
 
-  const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
-    const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
-    if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
-    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa.' };
-    
-    setUser(u);
-    sessionStorage.setItem('auth_user', JSON.stringify(u));
     return { ok: true };
   }, [usuarios]);
 
   const logout = useCallback(() => {
     setUser(null);
-    sessionStorage.removeItem('auth_user');
+    sessionStorage.removeItem(KEYS.sessao);
   }, []);
 
-  const registrar = useCallback(async (nome: string, loginStr: string, senha: string, role: UserRole): Promise<{ ok: boolean; motivo: string }> => {
-    const loginUsado = usuarios.some(u => u.login.toLowerCase() === loginStr.toLowerCase());
-    const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase());
-    
-    if (loginUsado) return { ok: false, motivo: 'Este usuário já existe.' };
-    if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente.' };
+  const registrar = useCallback(async (
+    nome: string,
+    loginStr: string,
+    senha: string,
+    role: UserRole
+  ) => {
+    const loginExiste = usuarios.some(
+      u => u.login.toLowerCase() === loginStr.toLowerCase()
+    );
 
-    // Define status: Admin entra direto, Operador fica pendente
-    const status = role === 'admin' ? 'ativo' : 'pendente';
+    const pedidoExiste = solicitacoes.some(
+      s =>
+        s.login.toLowerCase() === loginStr.toLowerCase() &&
+        s.status === 'pendente'
+    );
 
-    const { error } = await supabase.from('usuarios').insert({
+    if (loginExiste) {
+      return { ok: false, motivo: 'Este usuário já existe.' };
+    }
+
+    if (pedidoExiste) {
+      return { ok: false, motivo: 'Já existe uma solicitação pendente para este usuário.' };
+    }
+
+    const novaSolicitacao: Solicitacao = {
+      id: Math.random().toString(36).slice(2),
       nome,
       login: loginStr,
       senha,
       role,
-      status,
-    });
+      status: 'pendente',
+      criadoEm: new Date().toISOString(),
+    };
 
-    if (error) return { ok: false, motivo: 'Erro ao criar conta. Tente novamente.' };
+    const novas = [...solicitacoes, novaSolicitacao];
+    setSolicitacoes(novas);
+    saveSolicitacoes(novas);
 
-    await fetchAllUsers();
-
-    if (role === 'admin') {
-      return { ok: true, motivo: 'Administrador criado! Faça login.' };
-    } else {
-      return { ok: true, motivo: 'Solicitação enviada! Aguarde a aprovação do administrador.' };
-    }
-  }, [usuarios, solicitacoes, fetchAllUsers]);
+    return {
+      ok: true,
+      motivo:
+        role === 'admin'
+          ? 'Solicitação enviada! Aguarde o Admin principal liberar seu acesso.'
+          : 'Solicitação enviada! Aguarde a aprovação do administrador.',
+    };
+  }, [usuarios, solicitacoes]);
 
   const aprovarSolicitacao = useCallback(async (id: string) => {
-    const sol = solicitacoes.find(s => s.id === id);
-    if (!sol) return;
+    const solicitacao = solicitacoes.find(s => s.id === id);
+    if (!solicitacao) return;
 
-    // Verifica se é aprovação de admin e se o usuário logado é o admin principal
-    if (sol.role === 'admin' && user?.login !== 'admin') {
-      return; // Apenas o admin principal pode aprovar novos admins
-    }
-
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ status: 'ativo' })
-      .eq('id', id);
-
-    if (!error) {
-      await fetchAllUsers();
-    }
-  }, [solicitacoes, fetchAllUsers, user]);
-
-  const rejeitarSolicitacao = useCallback(async (id: string) => {
-    const sol = solicitacoes.find(s => s.id === id);
-    if (!sol) return;
-
-    if (sol.role === 'admin' && user?.login !== 'admin') {
+    if (solicitacao.role === 'admin' && user?.login !== 'admin') {
+      alert('Somente o Admin principal pode aprovar novos administradores.');
       return;
     }
 
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ status: 'rejeitado' })
-      .eq('id', id);
+    const novoUsuario: User = {
+      id: Math.random().toString(36).slice(2),
+      nome: solicitacao.nome,
+      login: solicitacao.login,
+      senha: solicitacao.senha,
+      role: solicitacao.role,
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+    };
 
-    if (!error) {
-      await fetchAllUsers();
-    }
-  }, [solicitacoes, fetchAllUsers, user]);
+    const novosUsuarios = [...usuarios, novoUsuario];
+    setUsuarios(novosUsuarios);
+    saveUsuarios(novosUsuarios);
+
+    const novasSolicitacoes = solicitacoes.map(s =>
+      s.id === id
+        ? { ...s, status: 'aprovado' as SolicitacaoStatus, avaliadoEm: new Date().toISOString() }
+        : s
+    );
+
+    setSolicitacoes(novasSolicitacoes);
+    saveSolicitacoes(novasSolicitacoes);
+  }, [solicitacoes, usuarios, user]);
+
+  const rejeitarSolicitacao = useCallback(async (id: string) => {
+    const novas = solicitacoes.map(s =>
+      s.id === id
+        ? { ...s, status: 'rejeitado' as SolicitacaoStatus, avaliadoEm: new Date().toISOString() }
+        : s
+    );
+
+    setSolicitacoes(novas);
+    saveSolicitacoes(novas);
+  }, [solicitacoes]);
 
   const excluirUsuario = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      await fetchAllUsers();
-    }
-  }, [fetchAllUsers]);
+    const novos = usuarios.filter(u => u.id !== id);
+    setUsuarios(novos);
+    saveUsuarios(novos);
+  }, [usuarios]);
 
   const alterarSenha = useCallback(async (id: string, novaSenha: string) => {
-    const { error } = await supabase
-      .from('usuarios')
-      .update({ senha: novaSenha })
-      .eq('id', id);
-
-    if (!error) {
-      await fetchAllUsers();
-    }
-  }, [fetchAllUsers]);
-
-  const podeAcessar = useCallback((aba: string): boolean => {
-    if (!user) return false;
-    return ABAS_PERMITIDAS[user.role].includes(aba);
-  }, [user]);
-
-  return (
-    <AuthContext.Provider value={{ user, usuarios, solicitacoes, loading, login, logout, registrar, aprovarSolicitacao, rejeitarSolicitacao, excluirUsuario, alterarSenha, podeAcessar }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth deve ser usado dentro de AuthProvider');
-  return ctx;
-}
+    const novos = usuarios.map(u =>
+      u.id === id ? { ...u
