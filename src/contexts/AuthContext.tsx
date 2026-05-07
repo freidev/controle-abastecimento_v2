@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { supabase } from '../lib/supabase';
 
 export type UserRole = 'admin' | 'operador';
-export type UserStatus = 'pendente' | 'aprovado' | 'rejeitado' | 'ativo';
 
 export interface User {
   id: string;
@@ -107,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback((loginStr: string, senha: string): { ok: boolean; motivo?: string } => {
     const u = usuarios.find(u => u.login.toLowerCase() === loginStr.toLowerCase() && u.senha === senha);
     if (!u) return { ok: false, motivo: 'Usuário ou senha incorretos.' };
-    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa ou pendente de aprovação.' };
+    if (!u.ativo) return { ok: false, motivo: 'Sua conta está inativa.' };
     
     setUser(u);
     sessionStorage.setItem('auth_user', JSON.stringify(u));
@@ -124,25 +123,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const solPendente = solicitacoes.some(s => s.login.toLowerCase() === loginStr.toLowerCase());
     
     if (loginUsado) return { ok: false, motivo: 'Este usuário já existe.' };
-    if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente com este usuário.' };
+    if (solPendente) return { ok: false, motivo: 'Já existe uma solicitação pendente.' };
 
-    // TODOS os novos cadastros (admin e operador) ficam como 'pendente'
+    // Define status: Admin entra direto, Operador fica pendente
+    const status = role === 'admin' ? 'ativo' : 'pendente';
+
     const { error } = await supabase.from('usuarios').insert({
       nome,
       login: loginStr,
       senha,
       role,
-      status: 'pendente', // Sempre pendente para aprovação
+      status,
     });
 
     if (error) return { ok: false, motivo: 'Erro ao criar conta. Tente novamente.' };
 
     await fetchAllUsers();
 
-    return { 
-      ok: true, 
-      motivo: 'Solicitação enviada! Aguarde a aprovação do administrador.' 
-    };
+    if (role === 'admin') {
+      return { ok: true, motivo: 'Administrador criado! Faça login.' };
+    } else {
+      return { ok: true, motivo: 'Solicitação enviada! Aguarde a aprovação do administrador.' };
+    }
   }, [usuarios, solicitacoes, fetchAllUsers]);
 
   const aprovarSolicitacao = useCallback(async (id: string) => {
@@ -168,9 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sol = solicitacoes.find(s => s.id === id);
     if (!sol) return;
 
-    // Verifica se é rejeição de admin e se o usuário logado é o admin principal
     if (sol.role === 'admin' && user?.login !== 'admin') {
-      return; // Apenas o admin principal pode rejeitar novos admins
+      return;
     }
 
     const { error } = await supabase
