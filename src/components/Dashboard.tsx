@@ -1,4 +1,3 @@
-
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
