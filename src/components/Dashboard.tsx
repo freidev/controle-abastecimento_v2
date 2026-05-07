@@ -490,14 +490,16 @@ export default function Dashboard({
 
   // ── DADOS POR GERÊNCIA (GRÁFICO DE COLUNAS) ──
   const dadosPorGerencia = useMemo(() => {
+    if (!dadosFiltrados) return [];
     const ag: Record<string, number> = {};
     dadosFiltrados.forEach(d => {
       const nome = d.gerencia || 'Sem Gerência';
-      ag[nome] = (ag[nome] || 0) + (d.litros || 0) * (precoDiesel || 0);
+      const val = (d.litros || 0) * (precoDiesel || 0);
+      ag[nome] = (ag[nome] || 0) + val;
     });
     return Object.entries(ag)
       .sort(([,a],[,b]) => b - a)
-      .map(([name, value]) => ({ name: name, value }));
+      .map(([name, value]) => ({ name: name, value: value }));
   }, [dadosFiltrados, precoDiesel]);
 
   const totalSelecionados = Object.values(selecoes).reduce((a, v) => a + (v?.length || 0), 0);
@@ -658,7 +660,7 @@ export default function Dashboard({
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false}/>
                 <XAxis 
                   dataKey="name" 
-                  tick={{fontSize: 10, angle: -45, textAnchor: 'end', height: 60}} 
+                  tick={{fontSize: 10, angle: -30, textAnchor: 'end'}} 
                   interval={0}
                 />
                 <YAxis tick={{fontSize: 10}} width={50} tickFormatter={(v) => formatCurrency(v)}/>
